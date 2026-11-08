@@ -1,0 +1,154 @@
+# Software requirements of the safety monitor virtual ECU.
+# Written in EARS form. Every requirement has a numeric pass criterion and at least one test
+# (pytest marker @pytest.mark.req("REQ-xx") or a C unit test whose name contains REQ_xx).
+# tools/rtm.py builds docs/rtm.md from this file, the test results and defects/*.md.
+version: 1
+requirements:
+  - id: REQ-01
+    category: function
+    title: Steering command range
+    text: >-
+      If the steering angle command is outside -540.0 deg to +540.0 deg, the ECU shall discard the
+      command, keep the previous steering output and record DTC STEER_RANGE.
+    pass: "540.1 deg and -540.1 deg are discarded and set DTC 0x4A0011; 540.0 deg and -540.0 deg are accepted."
+  - id: REQ-02
+    category: function
+    title: Speed command range
+    text: >-
+      If the speed command is outside 0.00 km/h to 200.00 km/h, the ECU shall discard the command,
+      keep the previous speed output and record DTC SPEED_RANGE.
+    pass: "200.01 km/h is discarded and sets DTC 0x4A0111; 200.00 km/h and 0.00 km/h are accepted."
+  - id: REQ-03
+    category: function
+    title: Steering rate limit
+    text: >-
+      While the ECU is in NORMAL or DEGRADED, the ECU shall limit the change of the steering output
+      to 5.0 deg per 10 ms control cycle.
+    pass: "A 100 deg command step gives output steps of exactly 5.0 deg per cycle until the target is reached."
+  - id: REQ-04
+    category: communication
+    title: Steering command timeout
+    text: >-
+      If no STEER_CMD frame is received for 30 ms, the ECU shall set the steering timeout fault and
+      enter SAFE_STOP within 50 ms of the fault.
+    pass: "Fault at 30 ms (+1 ms tick) after the last frame; SAFE_STOP no later than 80 ms after the last frame."
+  - id: REQ-05
+    category: communication
+    title: Speed command timeout
+    text: >-
+      If no SPEED_CMD frame is received for 30 ms while the ECU is in NORMAL, the ECU shall enter
+      DEGRADED and ramp the speed output down at 10 km/h per second.
+    pass: "DEGRADED at 30 ms (+1 ms); speed output falls by 0.10 km/h per 10 ms cycle."
+  - id: REQ-06
+    category: communication
+    title: E2E alive counter
+    text: >-
+      If a received command frame has an alive counter that is not the previous accepted counter
+      plus one (modulo 16), the ECU shall discard the frame. The first frame after start-up or after a
+      timeout is accepted to resynchronise.
+    pass: "Repeated, skipped and replayed counters are discarded; output unchanged."
+  - id: REQ-07
+    category: communication
+    title: E2E CRC
+    text: >-
+      If the CRC8 (SAE J1850 over the message Data ID and payload bytes 1 to 7) of a received command
+      frame does not match byte 0, the ECU shall discard the frame.
+    pass: "Any single-bit change of the payload or a wrong Data ID makes the frame discarded."
+  - id: REQ-08
+    category: function
+    title: Escalation on invalid frames
+    text: >-
+      When 3 consecutive command frames on one channel are discarded by the E2E check, the ECU shall
+      enter DEGRADED; when 10 consecutive steering frames are discarded, the ECU shall enter SAFE_STOP.
+    pass: "3rd consecutive invalid frame -> DEGRADED; 10th consecutive invalid steering frame -> SAFE_STOP."
+  - id: REQ-09
+    category: function
+    title: SAFE_STOP behaviour
+    text: >-
+      While the ECU is in SAFE_STOP, the ECU shall hold the steering output and ramp the speed output
+      down to 0 km/h at 10 km/h per second, ignoring new commands.
+    pass: "Steering output constant; speed output falls by 0.10 km/h per cycle to 0."
+  - id: REQ-10
+    category: function
+    title: Recovery from SAFE_STOP
+    text: >-
+      When valid frames on both command channels have been received continuously for 1.0 s while the
+      ECU is in SAFE_STOP and no fault is active, the ECU shall return to NORMAL and keep the
+      confirmed DTCs.
+    pass: "NORMAL after 1000 ms (+-10 ms) of valid traffic, not earlier; confirmedDTC bit still set."
+  - id: REQ-11
+    category: function
+    title: Recovery from DEGRADED and forbidden transitions
+    text: >-
+      When valid frames on both channels have been received continuously for 100 ms while the ECU is
+      in DEGRADED and no fault is active, the ECU shall return to NORMAL. The ECU shall never change
+      from SAFE_STOP to DEGRADED.
+    pass: "NORMAL after 100 ms of valid traffic; no SAFE_STOP -> DEGRADED transition in any test."
+  - id: REQ-12
+    category: communication
+    title: Status message
+    text: >-
+      The ECU shall transmit ECU_STATUS every 20 ms and, in addition, within 1 ms of every state
+      change.
+    pass: "Period 20 ms +-2 ms on the simulated clock; an extra ECU_STATUS in the same tick as the change."
+  - id: REQ-13
+    category: diagnostics
+    title: DTC status byte
+    text: >-
+      When a monitored fault is detected, the ECU shall set testFailed, testFailedThisOperationCycle,
+      pendingDTC, confirmedDTC and testFailedSinceLastClear of that DTC and clear its
+      testNotCompleted bits; when the same check later passes, the ECU shall clear testFailed only.
+    pass: "Status 0x2F while failing, 0x2E after the check passes; 0x50 after ClearDiagnosticInformation."
+  - id: REQ-14
+    category: diagnostics
+    title: Supported UDS services
+    text: >-
+      The ECU shall answer DiagnosticSessionControl (0x10), ReadDataByIdentifier (0x22),
+      ReadDTCInformation (0x19, sub-functions 0x01, 0x02, 0x0A), ClearDiagnosticInformation (0x14),
+      SecurityAccess (0x27) and TesterPresent (0x3E) on request ID 0x7E0 with response ID 0x7E8, and
+      answer any other service with NRC 0x11 and a wrong length with NRC 0x13.
+    pass: "Positive response format per ISO 14229-1 for each service; NRC 0x11, 0x12, 0x13, 0x31 where specified."
+  - id: REQ-15
+    category: diagnostics
+    title: P2 response time
+    text: >-
+      The ECU shall start its response to every diagnostic request within P2 = 50 ms, except when the
+      request suppresses the positive response.
+    pass: "Max request-to-first-response-frame time below 50 ms over all diagnostic tests."
+  - id: REQ-16
+    category: security
+    title: SecurityAccess session
+    text: >-
+      If SecurityAccess (0x27) is requested in the default session, the ECU shall answer with NRC 0x7F.
+    pass: "0x27 01 in default session -> 7F 27 7F."
+  - id: REQ-17
+    category: security
+    title: SecurityAccess attempt limit
+    text: >-
+      When the third wrong key is sent, the ECU shall answer with NRC 0x36 and, for the next 10 s,
+      answer every SecurityAccess request with NRC 0x37.
+    pass: "Keys 1-2 wrong -> NRC 0x35; key 3 wrong -> NRC 0x36; seed requests in the next 10 s -> NRC 0x37; after 10 s a seed is given."
+  - id: REQ-18
+    category: diagnostics
+    title: Session timeout
+    text: >-
+      If no diagnostic request is received for S3 = 5 s in a non-default session, the ECU shall return
+      to the default session and lock security access. TesterPresent shall keep the session alive.
+    pass: "Default session 5000 ms (+-10 ms) after the last request; still extended at 4.9 s with TesterPresent every 2 s for 10 s."
+  - id: REQ-19
+    category: security
+    title: Robustness of the diagnostic server
+    text: >-
+      The ECU shall not crash, hang or access memory out of bounds for any diagnostic request of up
+      to 4095 bytes, and shall keep answering valid requests afterwards.
+    pass: "0 sanitizer errors and 0 crashes over the fuzz runs; a valid request answered after fuzzing."
+  - id: REQ-20
+    category: update
+    title: Software update with integrity check and rollback
+    text: >-
+      While the ECU is in the programming session with security unlocked, the ECU shall accept an
+      image by RequestDownload (0x34), TransferData (0x36) and RequestTransferExit (0x37). If the
+      image hash does not match or its version is not newer than the running one, the ECU shall
+      reject it and keep the running version. If the transfer is interrupted, the ECU shall keep the
+      running version.
+    pass: "Good image: version updated after ECUReset; bad hash -> NRC 0x72; old version -> NRC 0x70; interrupted -> version unchanged."
