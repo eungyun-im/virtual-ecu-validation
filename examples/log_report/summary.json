@@ -1,0 +1,730 @@
+{
+ "duration_s": 13.103195905685425,
+ "frames": 3077,
+ "messages": {
+  "STEER_CMD": {
+   "id": "0x100",
+   "count": 1131,
+   "cycle_ms": 10,
+   "mean_ms": 11.505,
+   "min_ms": 9.75,
+   "max_ms": 1510.055,
+   "stdev_ms": 44.994,
+   "p99_ms": 10.198
+  },
+  "SPEED_CMD": {
+   "id": "0x101",
+   "count": 1281,
+   "cycle_ms": 10,
+   "mean_ms": 10.157,
+   "min_ms": 2.66,
+   "max_ms": 210.046,
+   "stdev_ms": 5.597,
+   "p99_ms": 10.25
+  },
+  "ECU_STATUS": {
+   "id": "0x200",
+   "count": 665,
+   "cycle_ms": 20,
+   "mean_ms": 19.734,
+   "min_ms": 1.001,
+   "max_ms": 20.431,
+   "stdev_ms": 1.762,
+   "p99_ms": 20.312
+  }
+ },
+ "gaps": [
+  {
+   "message": "STEER_CMD",
+   "start_s": 6.5021,
+   "gap_ms": 1510.05
+  },
+  {
+   "message": "STEER_CMD",
+   "start_s": 10.5021,
+   "gap_ms": 210.05
+  },
+  {
+   "message": "SPEED_CMD",
+   "start_s": 10.5022,
+   "gap_ms": 210.05
+  }
+ ],
+ "range_violations": [
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.5121
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.5221
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.5323
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.5421
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.5521
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.5621
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.5721
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.5821
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.5921
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.6021
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.6122
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.6221
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.6321
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.6421
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.6521
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.6621
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.6721
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.6821
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.6922
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.7021
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.7121
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.7221
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.7322
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.7421
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.7522
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.7621
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.7721
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.7821
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.7921
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.8021
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.8121
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.8221
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.8321
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.8421
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.8521
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.8621
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.8721
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.8821
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.8921
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.9021
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.9122
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.9221
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.9321
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.9421
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.9522
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.9621
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.9721
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.9821
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 2.9921
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.0021
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.0121
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.022
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.0322
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.0421
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.052
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.0619
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.072
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.0819
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.092
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.1019
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.112
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.1219
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.1319
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.1421
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.1519
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.1619
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.172
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.1819
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.1919
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.202
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.212
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.2219
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.2319
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.242
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.2519
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.2619
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.272
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.2819
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.2919
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.302
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.312
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.3219
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.3319
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.342
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.3519
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.3619
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.372
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.382
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.3919
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.402
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.412
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.422
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.4319
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.442
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.4519
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.462
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.472
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.4819
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.492
+  },
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "value": 600.0,
+   "t_s": 3.5019
+  }
+ ],
+ "e2e_errors": [
+  {
+   "message": "STEER_CMD",
+   "t_s": 5.012,
+   "kind": "crc"
+  },
+  {
+   "message": "STEER_CMD",
+   "t_s": 5.0219,
+   "kind": "crc"
+  },
+  {
+   "message": "STEER_CMD",
+   "t_s": 5.032,
+   "kind": "crc"
+  },
+  {
+   "message": "STEER_CMD",
+   "t_s": 5.0419,
+   "kind": "jump 4"
+  }
+ ],
+ "transitions": [
+  {
+   "t_s": 0.0021,
+   "from": "INIT",
+   "to": "NORMAL"
+  },
+  {
+   "t_s": 5.0324,
+   "from": "NORMAL",
+   "to": "DEGRADED"
+  },
+  {
+   "t_s": 5.1521,
+   "from": "DEGRADED",
+   "to": "NORMAL"
+  },
+  {
+   "t_s": 6.5321,
+   "from": "NORMAL",
+   "to": "SAFE_STOP"
+  },
+  {
+   "t_s": 9.0121,
+   "from": "SAFE_STOP",
+   "to": "NORMAL"
+  },
+  {
+   "t_s": 10.532,
+   "from": "NORMAL",
+   "to": "SAFE_STOP"
+  },
+  {
+   "t_s": 11.7123,
+   "from": "SAFE_STOP",
+   "to": "NORMAL"
+  },
+  {
+   "t_s": 13.0323,
+   "from": "NORMAL",
+   "to": "SAFE_STOP"
+  }
+ ],
+ "range_violation_intervals": [
+  {
+   "message": "STEER_CMD",
+   "signal": "SteerAngleCmd",
+   "start_s": 2.5121,
+   "end_s": 3.5019,
+   "frames": 100,
+   "min": 600.0,
+   "max": 600.0
+  }
+ ]
+}

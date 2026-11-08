@@ -32,16 +32,16 @@ asan: $(B)/asan/vecu
 # C unit tests on the simulated clock, built with ASan and UBSan
 unit:
 	@mkdir -p $(B)/unit
-	@set -e; for t in $(UNIT_TESTS); do \
+	@rc=0; for t in $(UNIT_TESTS); do \
 	  $(CC) $(UNIT_CFLAGS) -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all \
-	    -Iecu/tests ecu/tests/$$t.c $(CORE_SRC) -o $(B)/unit/$$t; \
-	  ./$(B)/unit/$$t --junit $(B)/unit/$$t.xml; done
+	    -Iecu/tests ecu/tests/$$t.c $(CORE_SRC) -o $(B)/unit/$$t || { rc=1; continue; }; \
+	  ./$(B)/unit/$$t --junit $(B)/unit/$$t.xml || rc=1; done; exit $$rc
 
 # Unit tests with coverage instrumentation (one build folder per test, so .gcda files do not collide)
 unit-cov:
-	@set -e; for t in $(UNIT_TESTS); do mkdir -p $(B)/cov/unit/$$t; \
+	@rc=0; for t in $(UNIT_TESTS); do mkdir -p $(B)/cov/unit/$$t; \
 	  ( cd $(B)/cov/unit/$$t && $(CC) $(UNIT_CFLAGS:-Iecu/include=-I../../../../ecu/include) -O0 -g --coverage \
-	    -I../../../../ecu/tests ../../../../ecu/tests/$$t.c $(addprefix ../../../../,$(CORE_SRC)) -o t && ./t > /dev/null ); done
+	    -I../../../../ecu/tests ../../../../ecu/tests/$$t.c $(addprefix ../../../../,$(CORE_SRC)) -o t && ./t > /dev/null ) || rc=1; done; exit $$rc
 
 systest: release
 	.venv/bin/python -m pytest tests -m "not slow" --vecu $(B)/release/vecu

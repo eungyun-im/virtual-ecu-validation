@@ -4,6 +4,8 @@ A safety monitor ECU written in C and validated on one laptop, from requirements
 
 This is the software-in-the-loop half of my verification work. The hardware-in-the-loop half (an NMPC on an NXP S32K312 board in a MORAI HILS loop) is in [baremetal-nmpc-hils-verification](https://github.com/eungyun-im/baremetal-nmpc-hils-verification). The ECU here plays the same role as the safety controller there.
 
+**Demo (1:40):** [docs/demo/demo.mp4](docs/demo/demo.mp4) — fault injection → detection → SAFE_STOP → recovery, the log analyzer, and CI blocking a pull request that reintroduced DEF-001.
+
 ## Results
 
 | Area | Result |
@@ -15,7 +17,7 @@ This is the software-in-the-loop half of my verification work. The hardware-in-t
 | Fault detection | steering timeout to SAFE_STOP **30 ms** after the last frame (limit 80 ms); P2 max **under 1 ms** (limit 50 ms) |
 | Defects | **DEF-001** found by fault injection: one corrupted frame drove the ECU to SAFE_STOP. Fixed, regression tests fail on the old code |
 
-Numbers are from the CI run on 2026-11-08; CI writes the same Test Report (verdict on its first line) for every commit.
+Numbers are from the CI run on 2026-11-08 ([Test Report](docs/test_report.md), [RTM](docs/rtm.md)); CI writes the same report, verdict on its first line, for every commit.
 
 ## What the ECU does
 
@@ -85,7 +87,7 @@ make coverage && make analyze           # gates
 FUZZ_SECONDS=60 make fuzz
 make report                             # reports/out/test_report.md
 PYTHONPATH=tools .venv/bin/python -m vecu.scenario --log logs/demo.log    # demo scenario with a CAN log
-PYTHONPATH=tools .venv/bin/python -m vecu.log_analyzer logs/demo.log      # log report
+PYTHONPATH=tools .venv/bin/python -m vecu.log_analyzer logs/demo.log      # log report (example: examples/log_report/report.md)
 ```
 
 ## Process

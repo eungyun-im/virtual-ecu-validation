@@ -1,0 +1,41 @@
+{
+ "t0": 1794129192.5080464,
+ "steps": [
+  {
+   "t_s": 0.0,
+   "caption": "normal driving"
+  },
+  {
+   "t_s": 1.002,
+   "caption": "steering command 90 deg (rate limited)"
+  },
+  {
+   "t_s": 2.501,
+   "caption": "out-of-range command 600 deg: discarded"
+  },
+  {
+   "t_s": 3.503,
+   "caption": "back to 20 deg"
+  },
+  {
+   "t_s": 5.001,
+   "caption": "fault: 3 corrupted steering frames"
+  },
+  {
+   "t_s": 6.502,
+   "caption": "fault: steering messages stop"
+  },
+  {
+   "t_s": 8.002,
+   "caption": "steering messages resume"
+  },
+  {
+   "t_s": 10.502,
+   "caption": "fault: bus-off on all channels for 0.2 s"
+  },
+  {
+   "t_s": 13.005,
+   "caption": "end"
+  }
+ ]
+}
