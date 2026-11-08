@@ -36,6 +36,7 @@ The project plan's nine work packages, each item with its evidence. Deviations f
 
 ## F. Static and dynamic analysis
 - [x] cppcheck with the MISRA addon, gcc `-fanalyzer`, plus the Clang analyzer — `tools/static_analysis.py`
+- [x] MISRA C:2012: 186 findings on v1.0.0 → 0 open; 179 fixed in code, the rest covered by recorded deviations (DEV-01..03) or a confirmed tool false positive (FP-01). CI fails on any new finding or unrecorded suppression — `docs/misra_deviations.md`
 - [x] ASan + UBSan on all unit and system tests, libFuzzer — `Makefile`, `tools/fuzz.sh`
 - [x] gcov statement and branch coverage, gcovr and lcov HTML — `tools/coverage.sh`
 

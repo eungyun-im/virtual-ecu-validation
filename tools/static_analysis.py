@@ -2,9 +2,14 @@
 """Static analysis gate.
 
   cppcheck (warning, performance, portability, style)   gate: 0 findings of severity error/warning
-  cppcheck MISRA C:2012 addon                           reported by rule, not a gate (no rule texts)
+  cppcheck MISRA C:2012 addon                           gate: 0 findings outside a recorded deviation
   gcc -fanalyzer (GCC >= 10)                            gate: 0 warnings
   clang --analyze (Clang static analyzer)               gate: 0 warnings
+MISRA deviations are inline suppressions of the form
+  /* cppcheck-suppress misra-c2012-<rule> ; DEV-nn */     (deviation from a rule)
+  /* cppcheck-suppress misra-<id> ; FP-nn */             (confirmed tool false positive)
+and each DEV-nn / FP-nn must be a row of docs/misra_deviations.md that lists that rule. A suppression without a
+recorded deviation, or a deviation that no longer matches a finding, fails the gate.
 Results: reports/out/static.json and reports/out/static_*.txt. A tool that is not installed is
 reported as "skipped" and does not pass silently: the JSON says so and the Test Report shows it.
 """
@@ -22,6 +27,9 @@ OUT = ROOT / "reports" / "out"
 SRC = sorted(str(p.relative_to(ROOT)) for p in (ROOT / "ecu" / "src").glob("*.c")) + \
       sorted(str(p.relative_to(ROOT)) for p in (ROOT / "ecu" / "app").glob("*.c"))
 INC = ["-Iecu/include"]
+DEV_DOC = ROOT / "docs" / "misra_deviations.md"
+SUPPRESS_RE = re.compile(r"cppcheck-suppress\s+misra-(?:c2012-)?([0-9.]+|config)\s*(?:;\s*((?:DEV|FP)-\d+))?")
+DEV_ROW_RE = re.compile(r"^\|\s*((?:DEV|FP)-\d+)\s*\|\s*([^|]+)\|", re.M)
 
 
 def run(cmd):
@@ -35,7 +43,7 @@ def tool_version(exe, arg="--version"):
 
 def cppcheck(exe, misra):
     xml_path = OUT / ("cppcheck_misra.xml" if misra else "cppcheck.xml")
-    cmd = [exe, "--std=c99", "--enable=warning,style,performance,portability", "--inline-suppr",
+    cmd = [exe, "--std=c99", "--enable=warning,style,performance,portability,information", "--inline-suppr", "--library=posix",
            "--suppress=missingIncludeSystem", "--xml", "--xml-version=2", "-D__linux__", "-D_GNU_SOURCE", *INC, *SRC]
     if misra:
         cmd.insert(1, "--addon=misra")
@@ -48,11 +56,35 @@ def cppcheck(exe, misra):
         return None
     for e in root.iter("error"):
         loc = e.find("location")
-        if e.get("id") in ("missingInclude", "checkersReport", "unmatchedSuppression"):
+        if e.get("id") in ("missingInclude", "missingIncludeSystem", "checkersReport", "normalCheckLevelMaxBranches",
+                           "toomanyconfigs"):
             continue
+        if e.get("id") == "unmatchedSuppression" and (not misra or "misra" not in (e.get("msg") or "")):
+            continue  # the plain run does not load the addon, so MISRA suppressions are unmatched there
         findings.append({"id": e.get("id"), "severity": e.get("severity"), "msg": e.get("msg"),
                          "file": loc.get("file") if loc is not None else "", "line": int(loc.get("line")) if loc is not None else 0})
     return findings
+
+
+def misra_deviations():
+    """Inline MISRA suppressions in the sources, checked against docs/misra_deviations.md."""
+    recorded = {}
+    if DEV_DOC.exists():
+        for dev, rules in DEV_ROW_RE.findall(DEV_DOC.read_text()):
+            recorded[dev] = set(re.findall(r"\d+\.\d+|config", rules))
+    sites, problems = [], []
+    files = SRC + sorted(str(p.relative_to(ROOT)) for p in (ROOT / "ecu").rglob("*.h"))
+    for f in files:
+        for n, line in enumerate((ROOT / f).read_text().splitlines(), 1):
+            for rule, dev in SUPPRESS_RE.findall(line):
+                sites.append({"file": f, "line": n, "rule": rule, "dev": dev})
+                if not dev:
+                    problems.append(f"{f}:{n}: suppression of {rule} names no deviation")
+                elif dev not in recorded:
+                    problems.append(f"{f}:{n}: {dev} is not in {DEV_DOC.relative_to(ROOT)}")
+                elif rule not in recorded[dev]:
+                    problems.append(f"{f}:{n}: {dev} does not cover rule {rule}")
+    return sites, problems, sorted(recorded)
 
 
 def gcc_analyzer():
@@ -88,13 +120,22 @@ def main():
         ver = tool_version(exe)
         base = cppcheck(exe, misra=False)
         misra = cppcheck(exe, misra=True)
-        misra_rules = collections.Counter(f["id"].replace("misra-c2012-", "") for f in (misra or []) if f["id"].startswith("misra"))
+        misra_open = [f for f in (misra or []) if f["id"].startswith("misra") or f["id"] == "unmatchedSuppression"]
+        misra_rules = collections.Counter(f["id"].replace("misra-c2012-", "") for f in misra_open)
+        sites, problems, devs = misra_deviations()
         gating = [f for f in (base or []) if f["severity"] in ("error", "warning")]
         result["tools"]["cppcheck"] = {"version": ver, "findings": base, "gating": len(gating),
                                        "style": sum(1 for f in (base or []) if f["severity"] not in ("error", "warning"))}
-        result["tools"]["misra"] = {"version": ver, "total": sum(misra_rules.values()), "by_rule": dict(misra_rules.most_common()),
-                                    "available": misra is not None}
+        result["tools"]["misra"] = {"version": ver, "total": len(misra_open), "by_rule": dict(misra_rules.most_common()),
+                                    "available": misra is not None, "deviation_sites": len(sites),
+                                    "deviations_by_rule": dict(collections.Counter(x["rule"] for x in sites).most_common()),
+                                    "deviation_records": devs, "deviation_problems": problems}
         result["gate"]["cppcheck"] = len(gating) == 0
+        result["gate"]["misra"] = misra is not None and not misra_open and not problems
+        (OUT / "static_misra.txt").write_text(
+            "".join(f"{f['file']}:{f['line']}: {f['id']} {f['msg']}\n" for f in misra_open)
+            + "".join(f"deviation problem: {p}\n" for p in problems)
+            + "".join(f"deviation {x['dev']} rule {x['rule']} at {x['file']}:{x['line']}\n" for x in sites))
     else:
         result["tools"]["cppcheck"] = {"skipped": "cppcheck not installed"}
     w, info = gcc_analyzer()
@@ -108,10 +149,14 @@ def main():
     result["passed"] = all(result["gate"].values()) and bool(result["gate"])
     (OUT / "static.json").write_text(json.dumps(result, indent=1))
     for name, t in result["tools"].items():
-        print(f"{name:15s} {json.dumps({k: v for k, v in t.items() if k not in ('findings', 'by_rule')})}")
+        print(f"{name:15s} {json.dumps({k: v for k, v in t.items() if k not in ('findings', 'deviation_problems')})}")
     if "cppcheck" in result["tools"] and result["tools"]["cppcheck"].get("findings"):
         for f in result["tools"]["cppcheck"]["findings"][:20]:
             print(f"  {f['severity']:8s} {f['id']:28s} {f['file']}:{f['line']} {f['msg']}")
+    if "misra" in result["tools"]:
+        for line in (OUT / "static_misra.txt").read_text().splitlines():
+            if not line.startswith("deviation DEV"):
+                print("  misra", line)
     print("static analysis gate:", "PASS" if result["passed"] else "FAIL")
     sys.exit(0 if result["passed"] else 1)
 

@@ -4,20 +4,20 @@
 
 /* ---------- helpers ---------- */
 
-static int elapsed(uint32_t now, uint32_t since, uint32_t ms) { return (uint32_t)(now - since) >= ms; }
+static bool elapsed(uint32_t now, uint32_t since, uint32_t ms) { return (uint32_t)(now - since) >= ms; }
 
 static int16_t rd_i16(const uint8_t *p) { return (int16_t)(uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8)); }
 static uint16_t rd_u16(const uint8_t *p) { return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8)); }
 
 static void chan_reset(vecu_chan_t *c)
 {
-  memset(c, 0, sizeof *c);
+  (void)memset(c, 0, sizeof *c);
   vecu_e2e_rx_reset(&c->e2e);
 }
 
-static void set_fault(vecu_t *e, uint8_t bit, int on)
+static void set_fault(vecu_t *e, uint8_t bit, bool on)
 {
-  if (on != 0) {
+  if (on) {
     e->faults = (uint8_t)(e->faults | bit);
   } else {
     e->faults = (uint8_t)(e->faults & (uint8_t)~bit);
@@ -50,27 +50,26 @@ static void send_status(vecu_t *e)
 static void go(vecu_t *e, vecu_state_t to, uint32_t now)
 {
   const vecu_state_t from = e->state;
-  if (from == to) {
-    return;
+  if (from != to) {
+    e->state = to;
+    e->state_since_ms = now;
+    ++e->transitions;
+    if (e->trace != NULL) {
+      e->trace(e->trace_ctx, from, to, now);
+    }
+    send_status(e); /* REQ-12: extra status frame in the same tick as the change */
   }
-  e->state = to;
-  e->state_since_ms = now;
-  ++e->transitions;
-  if (e->trace != NULL) {
-    e->trace(e->trace_ctx, from, to, now);
-  }
-  send_status(e); /* REQ-12: extra status frame in the same tick as the change */
 }
 
-static int streak_ok(const vecu_chan_t *c, uint32_t now, uint32_t ms)
+static bool streak_ok(const vecu_chan_t *c, uint32_t now, uint32_t ms)
 {
   return (c->streak != 0u) && elapsed(now, c->streak_start_ms, ms);
 }
 
 static void evaluate(vecu_t *e, uint32_t now)
 {
-  const int safe = (e->steer.timed_out != 0u) || (e->steer.invalid_run >= VECU_INVALID_TO_SAFE);
-  const int degraded = (e->speed.timed_out != 0u) || (e->steer.invalid_run >= VECU_INVALID_TO_DEGRADED) ||
+  const bool safe = (e->steer.timed_out != 0u) || (e->steer.invalid_run >= VECU_INVALID_TO_SAFE);
+  const bool degraded = (e->speed.timed_out != 0u) || (e->steer.invalid_run >= VECU_INVALID_TO_DEGRADED) ||
                        (e->speed.invalid_run >= VECU_INVALID_TO_DEGRADED);
   switch (e->state) {
     case VECU_INIT:
@@ -114,7 +113,7 @@ static void evaluate(vecu_t *e, uint32_t now)
 
 static void on_command(vecu_t *e, vecu_chan_t *c, uint16_t data_id, const vecu_frame_t *f, uint32_t now)
 {
-  const int is_steer = (c == &e->steer);
+  const bool is_steer = (c == &e->steer);
   vecu_e2e_result_t r;
   c->last_rx_ms = now;
   c->seen = 1u;
@@ -125,21 +124,21 @@ static void on_command(vecu_t *e, vecu_chan_t *c, uint16_t data_id, const vecu_f
       ++c->invalid_run;
     }
     if (c->invalid_run >= VECU_INVALID_TO_DEGRADED) {
-      set_fault(e, is_steer ? VECU_F_STEER_E2E : VECU_F_SPEED_E2E, 1);
-      vecu_dtc_report(&e->dtc, is_steer ? DTC_STEER_E2E : DTC_SPEED_E2E, 1);
+      set_fault(e, is_steer ? VECU_F_STEER_E2E : VECU_F_SPEED_E2E, true);
+      vecu_dtc_report(&e->dtc, is_steer ? DTC_STEER_E2E : DTC_SPEED_E2E, true);
     }
   } else {
     int32_t raw;
-    int in_range;
+    bool in_range;
     if (c->timed_out != 0u) {
       c->timed_out = 0u;
-      set_fault(e, is_steer ? VECU_F_STEER_TIMEOUT : VECU_F_SPEED_TIMEOUT, 0);
-      vecu_dtc_report(&e->dtc, is_steer ? DTC_STEER_TIMEOUT : DTC_SPEED_TIMEOUT, 0);
+      set_fault(e, is_steer ? VECU_F_STEER_TIMEOUT : VECU_F_SPEED_TIMEOUT, false);
+      vecu_dtc_report(&e->dtc, is_steer ? DTC_STEER_TIMEOUT : DTC_SPEED_TIMEOUT, false);
     }
     if (c->invalid_run != 0u) {
       c->invalid_run = 0u;
-      set_fault(e, is_steer ? VECU_F_STEER_E2E : VECU_F_SPEED_E2E, 0);
-      vecu_dtc_report(&e->dtc, is_steer ? DTC_STEER_E2E : DTC_SPEED_E2E, 0);
+      set_fault(e, is_steer ? VECU_F_STEER_E2E : VECU_F_SPEED_E2E, false);
+      vecu_dtc_report(&e->dtc, is_steer ? DTC_STEER_E2E : DTC_SPEED_E2E, false);
     }
     if (is_steer) {
       raw = rd_i16(&f->data[2]);
@@ -168,16 +167,16 @@ static void on_command(vecu_t *e, vecu_chan_t *c, uint16_t data_id, const vecu_f
 
 static void control_cycle(vecu_t *e)
 {
-  int rate_limited = 0;
+  bool rate_limited = false;
   if ((e->state == VECU_NORMAL) || (e->state == VECU_DEGRADED)) {
     if (e->steer.have_cmd != 0u) {
       int32_t d = e->steer.cmd_raw - e->steer_out;
       if (d > VECU_STEER_RATE_RAW) {
         d = VECU_STEER_RATE_RAW;
-        rate_limited = 1;
+        rate_limited = true;
       } else if (d < -VECU_STEER_RATE_RAW) {
         d = -VECU_STEER_RATE_RAW;
-        rate_limited = 1;
+        rate_limited = true;
       } else {
         /* within the limit */
       }
@@ -204,19 +203,20 @@ static void control_cycle(vecu_t *e)
 static void on_diag(vecu_t *e, const vecu_frame_t *f, int functional, uint32_t now)
 {
   static uint8_t req[VECU_ISOTP_MAX];
-  static uint8_t resp[VECU_ISOTP_MAX];
-  uint16_t n;
+  uint16_t n = 0u;
   if (functional != 0) {
-    /* functional requests: single frames only */
-    if (((f->data[0] >> 4) != 0u) || ((f->data[0] & 0x0Fu) == 0u) || ((f->data[0] & 0x0Fu) > 7u)) {
-      return;
+    /* functional requests: single frames only, anything else is ignored */
+    const uint8_t pci = f->data[0];
+    if (((pci >> 4) == 0u) && ((pci & 0x0Fu) != 0u) && ((pci & 0x0Fu) <= 7u)) {
+      const uint8_t len = (uint8_t)(pci & 0x0Fu);
+      n = len;
+      (void)memcpy(req, &f->data[1], len);
     }
-    n = (uint16_t)(f->data[0] & 0x0Fu);
-    memcpy(req, &f->data[1], n);
   } else {
     n = vecu_isotp_on_frame(&e->isotp, f, now, req);
   }
   if (n != 0u) {
+    static uint8_t resp[VECU_ISOTP_MAX];
     const uint16_t rl = vecu_uds_handle(e, req, n, functional, now, resp);
     if (rl != 0u) {
       (void)vecu_isotp_send(&e->isotp, resp, rl, now);
@@ -244,7 +244,7 @@ static void init_volatile(vecu_t *e, uint32_t now)
 
 void vecu_init(vecu_t *e, vecu_tx_fn tx, void *ctx, uint32_t now)
 {
-  memset(e, 0, sizeof *e);
+  (void)memset(e, 0, sizeof *e);
   e->tx = tx;
   e->tx_ctx = ctx;
   vecu_dtc_clear(&e->dtc);
@@ -276,13 +276,13 @@ void vecu_rx(vecu_t *e, const vecu_frame_t *f, uint32_t now)
 
 static void check_timeout(vecu_t *e, vecu_chan_t *c, uint32_t now)
 {
-  const int is_steer = (c == &e->steer);
+  const bool is_steer = (c == &e->steer);
   if ((c->seen != 0u) && (c->timed_out == 0u) && elapsed(now, c->last_rx_ms, VECU_CMD_TIMEOUT_MS)) {
     c->timed_out = 1u;
     c->streak = 0u;
     vecu_e2e_rx_reset(&c->e2e); /* resynchronise on the next frame (REQ-06) */
-    set_fault(e, is_steer ? VECU_F_STEER_TIMEOUT : VECU_F_SPEED_TIMEOUT, 1);
-    vecu_dtc_report(&e->dtc, is_steer ? DTC_STEER_TIMEOUT : DTC_SPEED_TIMEOUT, 1);
+    set_fault(e, is_steer ? VECU_F_STEER_TIMEOUT : VECU_F_SPEED_TIMEOUT, true);
+    vecu_dtc_report(&e->dtc, is_steer ? DTC_STEER_TIMEOUT : DTC_SPEED_TIMEOUT, true);
   }
 }
 
@@ -291,11 +291,11 @@ void vecu_tick(vecu_t *e, uint32_t now)
   check_timeout(e, &e->steer, now);
   check_timeout(e, &e->speed, now);
   evaluate(e, now);
-  if ((int32_t)(now - e->next_cycle_ms) >= 0) {
+  if (vecu_time_reached(now, e->next_cycle_ms)) {
     e->next_cycle_ms += VECU_CYCLE_MS;
     control_cycle(e);
   }
-  if ((int32_t)(now - e->next_status_ms) >= 0) {
+  if (vecu_time_reached(now, e->next_status_ms)) {
     e->next_status_ms += VECU_STATUS_PERIOD_MS;
     send_status(e);
   }

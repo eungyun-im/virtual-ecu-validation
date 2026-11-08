@@ -22,15 +22,22 @@ typedef struct {
   void *tx_ctx;
   /* receive */
   uint8_t rx_buf[VECU_ISOTP_MAX];
-  uint16_t rx_len, rx_got;
-  uint8_t rx_sn, rx_active;
+  uint16_t rx_len;
+  uint16_t rx_got;
+  uint8_t rx_sn;
+  uint8_t rx_active;
   uint32_t rx_deadline;
   /* transmit */
   uint8_t tx_buf[VECU_ISOTP_MAX];
-  uint16_t tx_len, tx_sent;
-  uint8_t tx_sn, tx_state; /* 0 idle, 1 wait FC, 2 sending CFs */
-  uint8_t tx_bs, tx_bs_left, tx_stmin;
-  uint32_t tx_next_ms, tx_deadline;
+  uint16_t tx_len;
+  uint16_t tx_sent;
+  uint8_t tx_sn;
+  uint8_t tx_state; /* 0 idle, 1 wait FC, 2 sending CFs */
+  uint8_t tx_bs;
+  uint8_t tx_bs_left;
+  uint8_t tx_stmin;
+  uint32_t tx_next_ms;
+  uint32_t tx_deadline;
   uint32_t errors; /* dropped frames and timeouts, for diagnostics */
 } vecu_isotp_t;
 
@@ -40,7 +47,7 @@ uint16_t vecu_isotp_on_frame(vecu_isotp_t *t, const vecu_frame_t *f, uint32_t no
 /* Start sending; returns 0, or -1 if busy or too long */
 int vecu_isotp_send(vecu_isotp_t *t, const uint8_t *data, uint16_t len, uint32_t now);
 void vecu_isotp_tick(vecu_isotp_t *t, uint32_t now);
-int vecu_isotp_busy(const vecu_isotp_t *t);
+bool vecu_isotp_busy(const vecu_isotp_t *t);
 
 #ifdef __cplusplus
 }

@@ -13,8 +13,8 @@ static void send_frame(vecu_isotp_t *t, const uint8_t *d, uint8_t n)
   vecu_frame_t f;
   f.id = t->tx_id;
   f.dlc = 8u;
-  memset(f.data, VECU_ISOTP_PAD, 8u);
-  memcpy(f.data, d, n);
+  (void)memset(f.data, VECU_ISOTP_PAD, 8u);
+  (void)memcpy(f.data, d, n);
   t->tx(t->tx_ctx, &f);
 }
 
@@ -26,13 +26,13 @@ static void send_fc(vecu_isotp_t *t, uint8_t status)
 
 void vecu_isotp_init(vecu_isotp_t *t, uint32_t tx_id, vecu_tx_fn tx, void *ctx)
 {
-  memset(t, 0, sizeof *t);
+  (void)memset(t, 0, sizeof *t);
   t->tx_id = tx_id;
   t->tx = tx;
   t->tx_ctx = ctx;
 }
 
-int vecu_isotp_busy(const vecu_isotp_t *t) { return t->tx_state != 0u; }
+bool vecu_isotp_busy(const vecu_isotp_t *t) { return t->tx_state != 0u; }
 
 static uint8_t stmin_ms(uint8_t raw)
 {
@@ -51,9 +51,8 @@ static void on_fc(vecu_isotp_t *t, const vecu_frame_t *f, uint32_t now)
 {
   const uint8_t fs = (uint8_t)(f->data[0] & 0x0Fu);
   if (t->tx_state != 1u) {
-    return;
-  }
-  if (fs == 0u) { /* CTS */
+    /* no flow control expected: ignore */
+  } else if (fs == 0u) { /* CTS */
     t->tx_bs = f->data[1];
     t->tx_bs_left = f->data[1];
     t->tx_stmin = stmin_ms(f->data[2]);
@@ -72,13 +71,12 @@ uint16_t vecu_isotp_on_frame(vecu_isotp_t *t, const vecu_frame_t *f, uint32_t no
   uint16_t done = 0u;
   const uint8_t pci = (uint8_t)(f->data[0] >> 4);
   if (f->dlc < 1u) {
-    return 0u;
-  }
-  if (pci == N_SF) {
+    /* empty frame: ignore */
+  } else if (pci == N_SF) {
     const uint8_t n = (uint8_t)(f->data[0] & 0x0Fu);
     if ((n >= 1u) && (n <= 7u) && ((uint8_t)(n + 1u) <= f->dlc)) {
       t->rx_active = 0u;
-      memcpy(out, &f->data[1], n);
+      (void)memcpy(out, &f->data[1], n);
       done = n;
     } else {
       ++t->errors;
@@ -92,7 +90,7 @@ uint16_t vecu_isotp_on_frame(vecu_isotp_t *t, const vecu_frame_t *f, uint32_t no
       ++t->errors;
     } else {
       t->rx_len = len;
-      memcpy(t->rx_buf, &f->data[2], 6u);
+      (void)memcpy(t->rx_buf, &f->data[2], 6u);
       t->rx_got = 6u;
       t->rx_sn = 1u;
       t->rx_active = 1u;
@@ -113,13 +111,13 @@ uint16_t vecu_isotp_on_frame(vecu_isotp_t *t, const vecu_frame_t *f, uint32_t no
         t->rx_active = 0u;
         ++t->errors;
       } else {
-        memcpy(&t->rx_buf[t->rx_got], &f->data[1], n);
+        (void)memcpy(&t->rx_buf[t->rx_got], &f->data[1], n);
         t->rx_got = (uint16_t)(t->rx_got + n);
         t->rx_sn = (uint8_t)((t->rx_sn + 1u) & 0x0Fu);
         t->rx_deadline = now + VECU_ISOTP_N_CR_MS;
         if (t->rx_got == t->rx_len) {
           t->rx_active = 0u;
-          memcpy(out, t->rx_buf, t->rx_len);
+          (void)memcpy(out, t->rx_buf, t->rx_len);
           done = t->rx_len;
         }
       }
@@ -140,15 +138,15 @@ int vecu_isotp_send(vecu_isotp_t *t, const uint8_t *data, uint16_t len, uint32_t
   } else if (len <= 7u) {
     uint8_t sf[8];
     sf[0] = (uint8_t)len;
-    memcpy(&sf[1], data, len);
+    (void)memcpy(&sf[1], data, len);
     send_frame(t, sf, (uint8_t)(len + 1u));
   } else {
     uint8_t ff[8];
-    memcpy(t->tx_buf, data, len);
+    (void)memcpy(t->tx_buf, data, len);
     t->tx_len = len;
     ff[0] = (uint8_t)((N_FF << 4) | (uint8_t)(len >> 8));
     ff[1] = (uint8_t)(len & 0xFFu);
-    memcpy(&ff[2], data, 6u);
+    (void)memcpy(&ff[2], data, 6u);
     send_frame(t, ff, 8u);
     t->tx_sent = 6u;
     t->tx_sn = 1u;
@@ -161,22 +159,22 @@ int vecu_isotp_send(vecu_isotp_t *t, const uint8_t *data, uint16_t len, uint32_t
 void vecu_isotp_tick(vecu_isotp_t *t, uint32_t now)
 {
   unsigned burst = 0u;
-  if ((t->rx_active != 0u) && ((int32_t)(now - t->rx_deadline) >= 0)) {
+  if ((t->rx_active != 0u) && vecu_time_reached(now, t->rx_deadline)) {
     t->rx_active = 0u;
     ++t->errors;
   }
-  if ((t->tx_state == 1u) && ((int32_t)(now - t->tx_deadline) >= 0)) {
+  if ((t->tx_state == 1u) && vecu_time_reached(now, t->tx_deadline)) {
     t->tx_state = 0u;
     ++t->errors;
   }
-  while ((t->tx_state == 2u) && ((int32_t)(now - t->tx_next_ms) >= 0) && (burst < CF_PER_TICK)) {
+  while ((t->tx_state == 2u) && vecu_time_reached(now, t->tx_next_ms) && (burst < CF_PER_TICK)) {
     uint8_t cf[8];
     uint16_t n = (uint16_t)(t->tx_len - t->tx_sent);
     if (n > 7u) {
       n = 7u;
     }
     cf[0] = (uint8_t)((N_CF << 4) | t->tx_sn);
-    memcpy(&cf[1], &t->tx_buf[t->tx_sent], n);
+    (void)memcpy(&cf[1], &t->tx_buf[t->tx_sent], n);
     send_frame(t, cf, (uint8_t)(n + 1u));
     t->tx_sent = (uint16_t)(t->tx_sent + n);
     t->tx_sn = (uint8_t)((t->tx_sn + 1u) & 0x0Fu);
@@ -189,10 +187,11 @@ void vecu_isotp_tick(vecu_isotp_t *t, uint32_t now)
         t->tx_state = 1u;
         t->tx_deadline = now + VECU_ISOTP_N_BS_MS;
       }
+    } else {
+      /* block size 0: no further flow control */
     }
     if ((t->tx_state == 2u) && (t->tx_stmin != 0u)) {
-      t->tx_next_ms = now + t->tx_stmin;
-      break;
+      t->tx_next_ms = now + t->tx_stmin; /* the loop condition stops here until STmin has passed */
     }
   }
 }

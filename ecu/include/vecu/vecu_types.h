@@ -4,8 +4,9 @@
 #ifndef VECU_TYPES_H
 #define VECU_TYPES_H
 
-#include <stdint.h>
+#include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,9 +31,8 @@ typedef struct {
 #define VECU_DATAID_SPEED 0x1A02u
 #define VECU_DATAID_STATUS 0x1A03u
 
-/* Signal scaling */
-#define VECU_STEER_LSB_DEG 0.1     /* SteerAngleCmd, SteerOut */
-#define VECU_SPEED_LSB_KMH 0.01    /* SpeedCmd, SpeedOut */
+/* Signal scaling (dbc/vecu.dbc): SteerAngleCmd and SteerOut 0.1 deg per bit, SpeedCmd and SpeedOut
+ * 0.01 km/h per bit. The core works in raw units only. */
 
 /* Limits in raw units (REQ-01, REQ-02, REQ-03) */
 #define VECU_STEER_MIN_RAW (-5400)      /* -540.0 deg */
@@ -60,6 +60,13 @@ typedef enum { VECU_NORMAL = 0, VECU_DEGRADED = 1, VECU_SAFE_STOP = 2, VECU_INIT
 #define VECU_F_STEER_E2E 0x10u
 #define VECU_F_SPEED_E2E 0x20u
 #define VECU_F_RATE_LIMITED 0x40u
+
+/* True when 'now' has reached 'deadline' on the wrapping 32-bit millisecond clock: the forward
+ * distance from deadline to now is below half the range. */
+static inline bool vecu_time_reached(uint32_t now, uint32_t deadline)
+{
+  return (uint32_t)(now - deadline) < 0x80000000u;
+}
 
 typedef void (*vecu_tx_fn)(void *ctx, const vecu_frame_t *f);
 

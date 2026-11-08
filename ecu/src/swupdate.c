@@ -11,7 +11,7 @@ static uint32_t be32(const uint8_t *p)
 
 void vecu_flash_init(vecu_flash_t *f)
 {
-  memset(f, 0, sizeof *f);
+  (void)memset(f, 0, sizeof *f);
   f->running_version = VECU_FW_VERSION_INITIAL;
 }
 
@@ -52,7 +52,7 @@ vecu_swu_result_t vecu_swu_transfer(vecu_flash_t *f, uint8_t seq, const uint8_t 
   } else if ((n == 0u) || (n > VECU_BLOCK_DATA) || ((f->received + n) > f->size)) {
     r = SWU_E_SUSPENDED;
   } else {
-    memcpy(&f->buf[f->received], data, n);
+    (void)memcpy(&f->buf[f->received], data, n);
     f->received += n;
     f->next_seq = (uint8_t)(f->next_seq + 1u);
   }
@@ -61,11 +61,12 @@ vecu_swu_result_t vecu_swu_transfer(vecu_flash_t *f, uint8_t seq, const uint8_t 
 
 vecu_swu_result_t vecu_swu_exit(vecu_flash_t *f)
 {
+  static const uint8_t k_magic[4] = {(uint8_t)'V', (uint8_t)'E', (uint8_t)'C', (uint8_t)'U'};
   vecu_swu_result_t r = SWU_OK;
   uint8_t digest[32];
   if ((f->active == 0u) || (f->received != f->size)) {
     r = SWU_E_SEQUENCE;
-  } else if ((memcmp(f->buf, "VECU", 4u) != 0) || (be32(&f->buf[4]) != f->announced_version) ||
+  } else if ((memcmp(f->buf, k_magic, sizeof k_magic) != 0) || (be32(&f->buf[4]) != f->announced_version) ||
              (be32(&f->buf[8]) != (f->size - VECU_IMG_HDR))) {
     r = SWU_E_PROGRAMMING;
   } else {

@@ -1,8 +1,8 @@
-**Verdict: PASS** — 20/20 requirements verified; 0 failed of 109 tests (49 unit, 59 system, 1 fuzz); branch coverage 83.4% (gate 80%); static analysis gate passed; 1 defects, 0 open Critical/Major.
+**Verdict: PASS** — 20/20 requirements verified; 0 failed of 109 tests (49 unit, 59 system, 1 fuzz); branch coverage 83.0% (gate 80%); static analysis gate passed (MISRA 0 open); 1 defects, 0 open Critical/Major.
 
 # Test Report: safety monitor virtual ECU
 
-Commit `b92d738`, generated 2026-11-08 09:27 UTC by `tools/test_report.py`. System tests ran on the `socketcan` bus with `asan` build.
+Commit `9e8d02f`, generated 2026-11-08 11:37 UTC by `tools/test_report.py`. System tests ran on the `socketcan` bus with `asan` build.
 
 ## Gates
 
@@ -10,8 +10,8 @@ Commit `b92d738`, generated 2026-11-08 09:27 UTC by `tools/test_report.py`. Syst
 |---|---|---|
 | All requirements verified | PASS | 20/20, `docs/rtm.md` |
 | No failed test | PASS | 109 tests, 0 failed |
-| Branch coverage >= 80% | PASS | lines 92.7%, branches 83.4%, functions 98.8% |
-| Static analysis | PASS | cppcheck: 0, gcc_analyzer: 0, clang_analyzer: 0 |
+| Branch coverage >= 80% | PASS | lines 93.5%, branches 83.0%, functions 97.9% |
+| Static analysis | PASS | cppcheck: 0, gcc_analyzer: 0, clang_analyzer: 0, MISRA open: 0 |
 | No open Critical/Major defect | PASS | 1 recorded |
 
 ## Requirements
@@ -41,23 +41,23 @@ Commit `b92d738`, generated 2026-11-08 09:27 UTC by `tools/test_report.py`. Syst
 
 ## Measurements
 
-- P2 (REQ-15): max 0.057 ms, mean 0.031 ms over 140 requests; limit 50 ms.
-- Fuzzing (REQ-19): 247422 executions in 120 s, 302 edges, exit code 0.
-- MISRA C:2012 (cppcheck addon, reported only): 186 findings; most frequent rules 15.5 (60), 17.7 (43), 12.3 (14), 12.1 (10), 10.8 (9), 14.4 (7).
+- P2 (REQ-15): max 0.077 ms, mean 0.025 ms over 140 requests; limit 50 ms.
+- Fuzzing (REQ-19): 206246 executions in 120 s, 300 edges, exit code 0.
+- MISRA C:2012 (cppcheck addon, gate): 0 open findings; 7 suppressed sites, each tied to a record in `docs/misra_deviations.md` (by rule: 21.6 (2), 8.7 (1), 17.3 (1), config (1), 21.5 (1), 21.10 (1)); record problems: 0.
 
 ### Coverage by file
 
 | File | Lines | Branches |
 |---|---:|---:|
-| `ecu/app/bus.c` | 56.1% | 31.5% |
-| `ecu/app/main.c` | 92.7% | 79.2% |
+| `ecu/app/bus.c` | 63.7% | 38.9% |
+| `ecu/app/main.c` | 94.2% | 75.0% |
 | `ecu/src/dtc.c` | 100.0% | 100.0% |
 | `ecu/src/e2e.c` | 100.0% | 100.0% |
-| `ecu/src/ecu.c` | 99.0% | 93.3% |
-| `ecu/src/isotp.c` | 90.4% | 78.2% |
+| `ecu/src/ecu.c` | 100.0% | 93.3% |
+| `ecu/src/isotp.c` | 91.8% | 78.2% |
 | `ecu/src/sha256.c` | 100.0% | 100.0% |
 | `ecu/src/swupdate.c` | 100.0% | 88.2% |
-| `ecu/src/uds.c` | 98.6% | 89.7% |
+| `ecu/src/uds.c` | 98.8% | 90.8% |
 
 ## Failed tests
 

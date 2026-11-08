@@ -50,11 +50,13 @@ typedef struct vecu {
   /* volatile part, re-initialised by power-up and ECUReset */
   vecu_state_t state;
   uint32_t state_since_ms;
-  vecu_chan_t steer, speed;
+  vecu_chan_t steer;
+  vecu_chan_t speed;
   int32_t steer_out;
   int32_t speed_out;
   uint8_t faults;
-  uint32_t next_cycle_ms, next_status_ms;
+  uint32_t next_cycle_ms;
+  uint32_t next_status_ms;
   uint8_t status_counter;
   vecu_uds_t uds;
   vecu_isotp_t isotp;

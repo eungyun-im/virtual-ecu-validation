@@ -57,7 +57,7 @@ def main():
     basis = (f"{n_pass}/{n_req} requirements verified; {len(failed)} failed of {len(m['tests'])} tests "
              f"({len(unit)} unit, {len(system)} system, {1 if fuzz else 0} fuzz); "
              + (f"branch coverage {cov['branch_percent']}% (gate {COV_GATE:.0f}%); " if cov else "coverage not run; ")
-             + ("static analysis gate passed; " if static and static["passed"] else ("static analysis FAILED; " if static else "static analysis not run; "))
+             + (f"static analysis gate passed (MISRA {static['tools'].get('misra', {}).get('total', '?')} open); " if static and static["passed"] else ("static analysis FAILED; " if static else "static analysis not run; "))
              + f"{len(m['defects'])} defects, {len(open_major)} open Critical/Major"
              + (f"; missing: {', '.join(missing)}" if missing else ""))
     try:
@@ -74,7 +74,8 @@ def main():
          f"| Branch coverage >= {COV_GATE:.0f}% | {'PASS' if checks['coverage'] else ('not run' if not cov else 'FAIL')} | "
          + (f"lines {cov['line_percent']}%, branches {cov['branch_percent']}%, functions {cov['function_percent']}%" if cov else "-") + " |",
          f"| Static analysis | {'PASS' if checks['static'] else ('not run' if not static else 'FAIL')} | "
-         + (", ".join(f"{k}: {v.get('gating', v.get('warnings', v.get('skipped', '-')))}" for k, v in static["tools"].items() if k != "misra") if static else "-") + " |",
+         + (", ".join(f"{k}: {v.get('gating', v.get('warnings', v.get('skipped', '-')))}" for k, v in static["tools"].items() if k != "misra")
+            + (f", MISRA open: {static['tools']['misra'].get('total', '?')}" if "misra" in static["tools"] else "") if static else "-") + " |",
          f"| No open Critical/Major defect | {'PASS' if checks['defects'] else 'FAIL'} | {len(m['defects'])} recorded |", ""]
     L += ["## Requirements", "", "| ID | Requirement | Verdict | Unit | System | Defects |", "|---|---|---|---:|---:|---|"]
     for r in m["requirements"]:
@@ -88,8 +89,10 @@ def main():
         L.append(f"- Fuzzing (REQ-19): {fuzz['executions']} executions in {fuzz['seconds']} s, {fuzz['coverage_edges']} edges, exit code {fuzz['exit_code']}.")
     if static and "misra" in static["tools"]:
         mi = static["tools"]["misra"]
-        top = ", ".join(f"{k} ({v})" for k, v in list(mi.get("by_rule", {}).items())[:6])
-        L.append(f"- MISRA C:2012 (cppcheck addon, reported only): {mi.get('total', 0)} findings; most frequent rules {top}.")
+        devs = ", ".join(f"{k} ({v})" for k, v in mi.get("deviations_by_rule", {}).items()) or "none"
+        L.append(f"- MISRA C:2012 (cppcheck addon, gate): {mi.get('total', 0)} open findings; "
+                 f"{mi.get('deviation_sites', 0)} suppressed sites, each tied to a record in `docs/misra_deviations.md` "
+                 f"(by rule: {devs}); record problems: {len(mi.get('deviation_problems', []))}.")
     if cov:
         L += ["", "### Coverage by file", "", "| File | Lines | Branches |", "|---|---:|---:|"]
         for f in cov["files"]:

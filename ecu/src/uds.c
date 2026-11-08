@@ -8,7 +8,6 @@
 
 #include "vecu/ecu.h"
 
-#define NRC_GENERAL_REJECT 0x10u
 #define NRC_SNS 0x11u   /* serviceNotSupported */
 #define NRC_SFNS 0x12u  /* subFunctionNotSupported */
 #define NRC_IMLOIF 0x13u /* incorrectMessageLengthOrInvalidFormat */
@@ -31,9 +30,6 @@
 #define P2_MS 50u
 #define P2STAR_10MS 500u
 
-static const char k_vin[] = "VECUDEMO000000001"; /* 17 characters */
-static const char k_serial[] = "SN-0001";
-
 static uint16_t nrc(uint8_t *resp, uint8_t sid, uint8_t code)
 {
   resp[0] = 0x7Fu;
@@ -42,6 +38,8 @@ static uint16_t nrc(uint8_t *resp, uint8_t sid, uint8_t code)
   return 3u;
 }
 
+/* Exported for the unit tests and the tester tool, which compute the expected key. */
+/* cppcheck-suppress misra-c2012-8.7 ; DEV-03 */
 uint32_t vecu_uds_key(uint32_t seed)
 {
   const uint32_t x = seed ^ 0x5A3C96E1u;
@@ -51,7 +49,7 @@ uint32_t vecu_uds_key(uint32_t seed)
 void vecu_uds_init(vecu_uds_t *u, uint32_t now)
 {
   const uint32_t prng = u->seed_state;
-  memset(u, 0, sizeof *u);
+  (void)memset(u, 0, sizeof *u);
   u->session = UDS_SESSION_DEFAULT;
   u->last_req_ms = now;
   u->seed_state = (prng != 0u) ? prng : (0x9E3779B9u ^ now);
@@ -76,67 +74,84 @@ static void to_default(vecu_t *e)
 }
 
 /* ---------- 0x10 DiagnosticSessionControl ---------- */
-static uint16_t svc_session(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r, int *suppress)
+static uint16_t svc_session(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r, bool *suppress)
 {
-  uint8_t sub;
+  uint8_t code = 0u;
+  uint16_t rl = 0u;
+  uint8_t sub = 0u;
   if (n != 2u) {
-    return nrc(r, 0x10u, NRC_IMLOIF);
-  }
-  sub = (uint8_t)(q[1] & 0x7Fu);
-  *suppress = (q[1] & 0x80u) != 0u;
-  if (sub == UDS_SESSION_DEFAULT) {
-    to_default(e);
-  } else if (sub == UDS_SESSION_EXTENDED) {
-    if (e->uds.session == UDS_SESSION_PROGRAMMING) {
-      vecu_swu_abort(&e->flash);
-    }
-    e->uds.session = UDS_SESSION_EXTENDED;
-  } else if (sub == UDS_SESSION_PROGRAMMING) {
-    if (e->uds.session == UDS_SESSION_DEFAULT) {
-      return nrc(r, 0x10u, NRC_CNC); /* programming only from the extended session */
-    }
-    e->uds.session = UDS_SESSION_PROGRAMMING;
+    code = NRC_IMLOIF;
   } else {
-    return nrc(r, 0x10u, NRC_SFNS);
+    sub = (uint8_t)(q[1] & 0x7Fu);
+    *suppress = (q[1] & 0x80u) != 0u;
+    if (sub == (uint8_t)UDS_SESSION_DEFAULT) {
+      to_default(e);
+    } else if (sub == (uint8_t)UDS_SESSION_EXTENDED) {
+      if (e->uds.session == UDS_SESSION_PROGRAMMING) {
+        vecu_swu_abort(&e->flash);
+      }
+      e->uds.session = UDS_SESSION_EXTENDED;
+    } else if (sub == (uint8_t)UDS_SESSION_PROGRAMMING) {
+      if (e->uds.session == UDS_SESSION_DEFAULT) {
+        code = NRC_CNC; /* programming only from the extended session */
+      } else {
+        e->uds.session = UDS_SESSION_PROGRAMMING;
+      }
+    } else {
+      code = NRC_SFNS;
+    }
   }
-  r[0] = 0x50u;
-  r[1] = sub;
-  r[2] = 0u;
-  r[3] = (uint8_t)P2_MS;
-  r[4] = (uint8_t)(P2STAR_10MS >> 8);
-  r[5] = (uint8_t)(P2STAR_10MS & 0xFFu);
-  return 6u;
+  if (code != 0u) {
+    rl = nrc(r, 0x10u, code);
+  } else {
+    r[0] = 0x50u;
+    r[1] = sub;
+    r[2] = 0u;
+    r[3] = (uint8_t)P2_MS;
+    r[4] = (uint8_t)(P2STAR_10MS >> 8);
+    r[5] = (uint8_t)(P2STAR_10MS & 0xFFu);
+    rl = 6u;
+  }
+  return rl;
 }
 
 /* ---------- 0x11 ECUReset ---------- */
-static uint16_t svc_reset(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r, int *suppress)
+static uint16_t svc_reset(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r, bool *suppress)
 {
+  uint16_t rl;
   if (n != 2u) {
-    return nrc(r, 0x11u, NRC_IMLOIF);
+    rl = nrc(r, 0x11u, NRC_IMLOIF);
+  } else if ((q[1] & 0x7Fu) != 0x01u) {
+    rl = nrc(r, 0x11u, NRC_SFNS);
+  } else {
+    *suppress = (q[1] & 0x80u) != 0u;
+    e->uds.reset_pending = 1u; /* after the response has left */
+    r[0] = 0x51u;
+    r[1] = 0x01u;
+    rl = 2u;
   }
-  if ((q[1] & 0x7Fu) != 0x01u) {
-    return nrc(r, 0x11u, NRC_SFNS);
-  }
-  *suppress = (q[1] & 0x80u) != 0u;
-  e->uds.reset_pending = 1u; /* after the response has left */
-  r[0] = 0x51u;
-  r[1] = 0x01u;
-  return 2u;
+  return rl;
 }
 
 /* ---------- 0x22 ReadDataByIdentifier ---------- */
-static uint16_t put_did(vecu_t *e, uint16_t did, uint8_t *r, uint16_t at)
+/* Writes DID and data at r[at]; returns the bytes written, 0 for an unsupported DID. */
+static uint16_t put_did(const vecu_t *e, uint16_t did, uint8_t *r, uint16_t at)
 {
+  static const uint8_t k_vin[17] = {(uint8_t)'V', (uint8_t)'E', (uint8_t)'C', (uint8_t)'U', (uint8_t)'D', (uint8_t)'E',
+                                    (uint8_t)'M', (uint8_t)'O', (uint8_t)'0', (uint8_t)'0', (uint8_t)'0', (uint8_t)'0',
+                                    (uint8_t)'0', (uint8_t)'0', (uint8_t)'0', (uint8_t)'0', (uint8_t)'1'};
+  static const uint8_t k_serial[7] = {(uint8_t)'S', (uint8_t)'N', (uint8_t)'-', (uint8_t)'0',
+                                      (uint8_t)'0', (uint8_t)'0', (uint8_t)'1'};
   uint16_t len = 0u;
   uint8_t v[17];
   switch (did) {
     case 0xF190u:
-      len = 17u;
-      memcpy(v, k_vin, 17u);
+      len = (uint16_t)sizeof k_vin;
+      (void)memcpy(v, k_vin, sizeof k_vin);
       break;
     case 0xF18Cu:
-      len = (uint16_t)(sizeof k_serial - 1u);
-      memcpy(v, k_serial, len);
+      len = (uint16_t)sizeof k_serial;
+      (void)memcpy(v, k_serial, sizeof k_serial);
       break;
     case 0xF195u: /* software version, u32 big-endian (major << 16 | minor << 8 | patch) */
       len = 4u;
@@ -164,131 +179,127 @@ static uint16_t put_did(vecu_t *e, uint16_t did, uint8_t *r, uint16_t at)
       v[1] = (uint8_t)((uint16_t)e->speed_out & 0xFFu);
       break;
     default:
-      return 0u;
+      len = 0u; /* not supported */
+      break;
   }
-  r[at] = (uint8_t)(did >> 8);
-  r[at + 1u] = (uint8_t)(did & 0xFFu);
-  memcpy(&r[at + 2u], v, len);
-  return (uint16_t)(len + 2u);
+  if (len != 0u) {
+    r[at] = (uint8_t)(did >> 8);
+    r[at + 1u] = (uint8_t)(did & 0xFFu);
+    (void)memcpy(&r[at + 2u], v, len);
+    len = (uint16_t)(len + 2u);
+  }
+  return len;
 }
 
-static uint16_t svc_rdbi(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r)
+static uint16_t svc_rdbi(const vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r)
 {
-  uint16_t at = 1u, i;
-  if ((n < 3u) || (((n - 1u) % 2u) != 0u) || (n > 1u + 2u * 8u)) {
-    return nrc(r, 0x22u, NRC_IMLOIF);
-  }
-  r[0] = 0x62u;
-  for (i = 1u; i < n; i = (uint16_t)(i + 2u)) {
-    const uint16_t did = (uint16_t)(((uint16_t)q[i] << 8) | q[i + 1u]);
-    const uint16_t w = put_did(e, did, r, at);
-    if (w == 0u) {
-      return nrc(r, 0x22u, NRC_ROOR);
+  uint16_t rl;
+  if ((n < 3u) || (((n - 1u) % 2u) != 0u) || (n > (1u + (2u * 8u)))) {
+    rl = nrc(r, 0x22u, NRC_IMLOIF);
+  } else {
+    uint16_t at = 1u;
+    uint16_t i = 1u;
+    bool ok = true;
+    r[0] = 0x62u;
+    while (ok && (i < n)) {
+      const uint16_t did = (uint16_t)(((uint16_t)q[i] << 8) | q[i + 1u]);
+      const uint16_t w = put_did(e, did, r, at);
+      if (w == 0u) {
+        ok = false;
+      } else {
+        at = (uint16_t)(at + w);
+        i = (uint16_t)(i + 2u);
+      }
     }
-    at = (uint16_t)(at + w);
+    rl = ok ? at : nrc(r, 0x22u, NRC_ROOR);
   }
-  return at;
+  return rl;
 }
 
 /* ---------- 0x19 ReadDTCInformation ---------- */
-static uint16_t svc_rdtc(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r, int *suppress)
+static uint16_t put_dtc(const vecu_t *e, uint8_t *r, uint16_t at, uint8_t i)
 {
-  uint8_t sub;
-  uint16_t at;
-  int i;
+  const uint32_t code = vecu_dtc_code((vecu_dtc_idx_t)i);
+  r[at] = (uint8_t)(code >> 16);
+  r[at + 1u] = (uint8_t)(code >> 8);
+  r[at + 2u] = (uint8_t)code;
+  r[at + 3u] = (uint8_t)(e->dtc.status[i] & DTC_AVAILABILITY_MASK);
+  return (uint16_t)(at + 4u);
+}
+
+static uint16_t svc_rdtc(const vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r, bool *suppress)
+{
+  uint8_t code = 0u;
+  uint16_t at = 0u;
   if (n < 2u) {
-    return nrc(r, 0x19u, NRC_IMLOIF);
-  }
-  sub = (uint8_t)(q[1] & 0x7Fu);
-  *suppress = (q[1] & 0x80u) != 0u;
-  r[0] = 0x59u;
-  r[1] = sub;
-  r[2] = DTC_AVAILABILITY_MASK;
-  if ((sub == 0x01u) || (sub == 0x02u)) {
-    const uint8_t mask = (n == 3u) ? q[2] : 0u;
-    uint16_t count = 0u;
-    if (n != 3u) {
-      return nrc(r, 0x19u, NRC_IMLOIF);
-    }
-    at = (sub == 0x01u) ? 6u : 3u;
-    for (i = 0; i < (int)DTC_COUNT; ++i) {
-      if ((e->dtc.status[i] & mask & DTC_AVAILABILITY_MASK) != 0u) {
-        ++count;
-        if (sub == 0x02u) {
-          const uint32_t code = vecu_dtc_code((vecu_dtc_idx_t)i);
-          r[at] = (uint8_t)(code >> 16);
-          r[at + 1u] = (uint8_t)(code >> 8);
-          r[at + 2u] = (uint8_t)code;
-          r[at + 3u] = (uint8_t)(e->dtc.status[i] & DTC_AVAILABILITY_MASK);
-          at = (uint16_t)(at + 4u);
+    code = NRC_IMLOIF;
+  } else {
+    const uint8_t sub = (uint8_t)(q[1] & 0x7Fu);
+    uint8_t i;
+    *suppress = (q[1] & 0x80u) != 0u;
+    r[0] = 0x59u;
+    r[1] = sub;
+    r[2] = DTC_AVAILABILITY_MASK;
+    if ((sub == 0x01u) || (sub == 0x02u)) {
+      if (n != 3u) {
+        code = NRC_IMLOIF;
+      } else {
+        const uint8_t mask = q[2];
+        uint16_t count = 0u;
+        at = (sub == 0x01u) ? (uint16_t)6u : (uint16_t)3u;
+        for (i = 0u; i < (uint8_t)DTC_COUNT; ++i) {
+          if ((e->dtc.status[i] & mask & DTC_AVAILABILITY_MASK) != 0u) {
+            ++count;
+            if (sub == 0x02u) {
+              at = put_dtc(e, r, at, i);
+            }
+          }
+        }
+        if (sub == 0x01u) {
+          r[3] = 0x01u; /* DTCFormatIdentifier: ISO 14229-1 */
+          r[4] = (uint8_t)(count >> 8);
+          r[5] = (uint8_t)(count & 0xFFu);
         }
       }
+    } else if (sub == 0x0Au) {
+      if (n != 2u) {
+        code = NRC_IMLOIF;
+      } else {
+        at = 3u;
+        for (i = 0u; i < (uint8_t)DTC_COUNT; ++i) {
+          at = put_dtc(e, r, at, i);
+        }
+      }
+    } else {
+      code = NRC_SFNS;
     }
-    if (sub == 0x01u) {
-      r[3] = 0x01u; /* DTCFormatIdentifier: ISO 14229-1 */
-      r[4] = (uint8_t)(count >> 8);
-      r[5] = (uint8_t)(count & 0xFFu);
-    }
-    return at;
   }
-  if (sub == 0x0Au) {
-    if (n != 2u) {
-      return nrc(r, 0x19u, NRC_IMLOIF);
-    }
-    at = 3u;
-    for (i = 0; i < (int)DTC_COUNT; ++i) {
-      const uint32_t code = vecu_dtc_code((vecu_dtc_idx_t)i);
-      r[at] = (uint8_t)(code >> 16);
-      r[at + 1u] = (uint8_t)(code >> 8);
-      r[at + 2u] = (uint8_t)code;
-      r[at + 3u] = (uint8_t)(e->dtc.status[i] & DTC_AVAILABILITY_MASK);
-      at = (uint16_t)(at + 4u);
-    }
-    return at;
-  }
-  return nrc(r, 0x19u, NRC_SFNS);
+  return (code != 0u) ? nrc(r, 0x19u, code) : at;
 }
 
 /* ---------- 0x14 ClearDiagnosticInformation ---------- */
 static uint16_t svc_clear(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r)
 {
+  uint16_t rl;
   if (n != 4u) {
-    return nrc(r, 0x14u, NRC_IMLOIF);
+    rl = nrc(r, 0x14u, NRC_IMLOIF);
+  } else if ((q[1] != 0xFFu) || (q[2] != 0xFFu) || (q[3] != 0xFFu)) {
+    rl = nrc(r, 0x14u, NRC_ROOR);
+  } else {
+    vecu_dtc_clear(&e->dtc);
+    r[0] = 0x54u;
+    rl = 1u;
   }
-  if ((q[1] != 0xFFu) || (q[2] != 0xFFu) || (q[3] != 0xFFu)) {
-    return nrc(r, 0x14u, NRC_ROOR);
-  }
-  vecu_dtc_clear(&e->dtc);
-  r[0] = 0x54u;
-  return 1u;
+  return rl;
 }
 
 /* ---------- 0x27 SecurityAccess (REQ-16, REQ-17) ---------- */
-static uint16_t svc_security(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r, uint32_t now)
+static uint8_t security_seed(vecu_uds_t *u, uint16_t n, uint8_t *r, uint32_t now)
 {
-  vecu_uds_t *u = &e->uds;
-  uint8_t sub;
-  if (u->session == UDS_SESSION_DEFAULT) {
-    return nrc(r, 0x27u, NRC_SNSIAS);
-  }
-  if (n < 2u) {
-    return nrc(r, 0x27u, NRC_IMLOIF);
-  }
-  sub = (uint8_t)(q[1] & 0x7Fu);
-  if ((sub != 0x01u) && (sub != 0x02u)) {
-    return nrc(r, 0x27u, NRC_SFNS);
-  }
-  if (u->locked_out != 0u) {
-    if ((int32_t)(now - u->lockout_until_ms) < 0) {
-      return nrc(r, 0x27u, NRC_RTDNE);
-    }
-    u->locked_out = 0u;
-    u->failed_attempts = 0u;
-  }
-  if (sub == 0x01u) {
-    if (n != 2u) {
-      return nrc(r, 0x27u, NRC_IMLOIF);
-    }
+  uint8_t code = 0u;
+  if (n != 2u) {
+    code = NRC_IMLOIF;
+  } else {
     u->seed = (u->unlocked != 0u) ? 0u : next_seed(u, now);
     u->seed_pending = (u->unlocked == 0u) ? 1u : 0u;
     r[0] = 0x67u;
@@ -297,47 +308,86 @@ static uint16_t svc_security(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r
     r[3] = (uint8_t)(u->seed >> 16);
     r[4] = (uint8_t)(u->seed >> 8);
     r[5] = (uint8_t)u->seed;
-    return 6u;
   }
+  return code;
+}
+
+static uint8_t security_key(vecu_uds_t *u, const uint8_t *q, uint16_t n, uint8_t *r, uint32_t now)
+{
+  uint8_t code = 0u;
   if (n != 6u) {
-    return nrc(r, 0x27u, NRC_IMLOIF);
-  }
-  if (u->seed_pending == 0u) {
-    return nrc(r, 0x27u, NRC_RSE);
-  }
-  u->seed_pending = 0u;
-  {
+    code = NRC_IMLOIF;
+  } else if (u->seed_pending == 0u) {
+    code = NRC_RSE;
+  } else {
     const uint32_t key = ((uint32_t)q[2] << 24) | ((uint32_t)q[3] << 16) | ((uint32_t)q[4] << 8) | (uint32_t)q[5];
+    u->seed_pending = 0u;
     if (key == vecu_uds_key(u->seed)) {
       u->unlocked = 1u;
       u->failed_attempts = 0u;
       r[0] = 0x67u;
       r[1] = 0x02u;
-      return 2u;
+    } else {
+      ++u->failed_attempts;
+      if (u->failed_attempts >= MAX_ATTEMPTS) {
+        u->locked_out = 1u;
+        u->lockout_until_ms = now + LOCKOUT_MS;
+        code = NRC_ENOA;
+      } else {
+        code = NRC_IK;
+      }
     }
   }
-  ++u->failed_attempts;
-  if (u->failed_attempts >= MAX_ATTEMPTS) {
-    u->locked_out = 1u;
-    u->lockout_until_ms = now + LOCKOUT_MS;
-    return nrc(r, 0x27u, NRC_ENOA);
+  return code;
+}
+
+static uint16_t svc_security(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r, uint32_t now)
+{
+  vecu_uds_t *u = &e->uds;
+  uint16_t rl;
+  uint8_t code = 0u;
+  uint8_t sub = 0u;
+  if (u->session == UDS_SESSION_DEFAULT) {
+    code = NRC_SNSIAS;
+  } else if (n < 2u) {
+    code = NRC_IMLOIF;
+  } else {
+    sub = (uint8_t)(q[1] & 0x7Fu);
+    if ((sub != 0x01u) && (sub != 0x02u)) {
+      code = NRC_SFNS;
+    } else if ((u->locked_out != 0u) && !vecu_time_reached(now, u->lockout_until_ms)) {
+      code = NRC_RTDNE;
+    } else {
+      if (u->locked_out != 0u) { /* delay expired */
+        u->locked_out = 0u;
+        u->failed_attempts = 0u;
+      }
+      code = (sub == 0x01u) ? security_seed(u, n, r, now) : security_key(u, q, n, r, now);
+    }
   }
-  return nrc(r, 0x27u, NRC_IK);
+  if (code != 0u) {
+    rl = nrc(r, 0x27u, code);
+  } else {
+    rl = (sub == 0x01u) ? (uint16_t)6u : (uint16_t)2u; /* seed response or key accepted */
+  }
+  return rl;
 }
 
 /* ---------- 0x3E TesterPresent ---------- */
-static uint16_t svc_tester(const uint8_t *q, uint16_t n, uint8_t *r, int *suppress)
+static uint16_t svc_tester(const uint8_t *q, uint16_t n, uint8_t *r, bool *suppress)
 {
+  uint16_t rl;
   if (n != 2u) {
-    return nrc(r, 0x3Eu, NRC_IMLOIF);
+    rl = nrc(r, 0x3Eu, NRC_IMLOIF);
+  } else if ((q[1] & 0x7Fu) != 0u) {
+    rl = nrc(r, 0x3Eu, NRC_SFNS);
+  } else {
+    *suppress = (q[1] & 0x80u) != 0u;
+    r[0] = 0x7Eu;
+    r[1] = 0x00u;
+    rl = 2u;
   }
-  if ((q[1] & 0x7Fu) != 0u) {
-    return nrc(r, 0x3Eu, NRC_SFNS);
-  }
-  *suppress = (q[1] & 0x80u) != 0u;
-  r[0] = 0x7Eu;
-  r[1] = 0x00u;
-  return 2u;
+  return rl;
 }
 
 /* ---------- 0x34 / 0x36 / 0x37 software download (REQ-20) ---------- */
@@ -347,66 +397,104 @@ static uint8_t swu_nrc(vecu_swu_result_t s)
   return map[s];
 }
 
-static uint16_t svc_download(vecu_t *e, uint8_t sid, const uint8_t *q, uint16_t n, uint8_t *r)
+static uint32_t rd_be32(const uint8_t *p)
 {
-  vecu_swu_result_t s;
-  if (e->uds.session != UDS_SESSION_PROGRAMMING) {
-    return nrc(r, sid, NRC_SNSIAS);
-  }
-  if (e->uds.unlocked == 0u) {
-    return nrc(r, sid, NRC_SAD);
-  }
-  if (sid == 0x34u) {
-    uint32_t addr, size;
-    if (n != 11u) {
-      return nrc(r, sid, NRC_IMLOIF);
-    }
-    if ((q[1] != 0x00u) || (q[2] != 0x44u)) {
-      return nrc(r, sid, NRC_ROOR); /* no compression or encryption; 4-byte address and size */
-    }
-    addr = ((uint32_t)q[3] << 24) | ((uint32_t)q[4] << 16) | ((uint32_t)q[5] << 8) | (uint32_t)q[6];
-    size = ((uint32_t)q[7] << 24) | ((uint32_t)q[8] << 16) | ((uint32_t)q[9] << 8) | (uint32_t)q[10];
-    s = vecu_swu_request_download(&e->flash, addr, size);
+  return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | (uint32_t)p[3];
+}
+
+/* 0x34 RequestDownload: format 0x00 (no compression or encryption), 4-byte address and size.
+ * The memoryAddress field carries the image version. */
+static uint8_t req_download(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r)
+{
+  uint8_t code = 0u;
+  if (n != 11u) {
+    code = NRC_IMLOIF;
+  } else if ((q[1] != 0x00u) || (q[2] != 0x44u)) {
+    code = NRC_ROOR;
+  } else {
+    const vecu_swu_result_t s = vecu_swu_request_download(&e->flash, rd_be32(&q[3]), rd_be32(&q[7]));
     if (s != SWU_OK) {
-      return nrc(r, sid, swu_nrc(s));
+      code = swu_nrc(s);
+    } else {
+      r[0] = 0x74u;
+      r[1] = 0x20u; /* maxNumberOfBlockLength in 2 bytes */
+      r[2] = (uint8_t)((VECU_BLOCK_DATA + 2u) >> 8);
+      r[3] = (uint8_t)((VECU_BLOCK_DATA + 2u) & 0xFFu);
     }
-    r[0] = 0x74u;
-    r[1] = 0x20u; /* maxNumberOfBlockLength in 2 bytes */
-    r[2] = (uint8_t)((VECU_BLOCK_DATA + 2u) >> 8);
-    r[3] = (uint8_t)((VECU_BLOCK_DATA + 2u) & 0xFFu);
-    return 4u;
   }
-  if (sid == 0x36u) {
-    if (n < 2u) {
-      return nrc(r, sid, NRC_IMLOIF);
-    }
-    s = vecu_swu_transfer(&e->flash, q[1], &q[2], (uint16_t)(n - 2u));
+  return code;
+}
+
+/* 0x36 TransferData */
+static uint8_t transfer_data(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r)
+{
+  uint8_t code = 0u;
+  if (n < 2u) {
+    code = NRC_IMLOIF;
+  } else {
+    const vecu_swu_result_t s = vecu_swu_transfer(&e->flash, q[1], &q[2], (uint16_t)(n - 2u));
     if ((s != SWU_OK) && (s != SWU_REPEAT)) {
       if (s != SWU_E_WRONG_SEQ) {
         vecu_swu_abort(&e->flash);
       }
-      return nrc(r, sid, swu_nrc(s));
+      code = swu_nrc(s);
+    } else {
+      r[0] = 0x76u;
+      r[1] = q[1];
     }
-    r[0] = 0x76u;
-    r[1] = q[1];
-    return 2u;
   }
+  return code;
+}
+
+/* 0x37 RequestTransferExit */
+static uint8_t transfer_exit(vecu_t *e, uint16_t n, uint8_t *r)
+{
+  uint8_t code = 0u;
   if (n != 1u) {
-    return nrc(r, sid, NRC_IMLOIF);
+    code = NRC_IMLOIF;
+  } else {
+    const vecu_swu_result_t s = vecu_swu_exit(&e->flash);
+    if (s != SWU_OK) {
+      code = swu_nrc(s);
+    } else {
+      r[0] = 0x77u;
+    }
   }
-  s = vecu_swu_exit(&e->flash);
-  if (s != SWU_OK) {
-    return nrc(r, sid, swu_nrc(s));
+  return code;
+}
+
+static uint16_t svc_download(vecu_t *e, uint8_t sid, const uint8_t *q, uint16_t n, uint8_t *r)
+{
+  uint8_t code;
+  uint16_t rl;
+  if (e->uds.session != UDS_SESSION_PROGRAMMING) {
+    code = NRC_SNSIAS;
+  } else if (e->uds.unlocked == 0u) {
+    code = NRC_SAD;
+  } else if (sid == 0x34u) {
+    code = req_download(e, q, n, r);
+  } else if (sid == 0x36u) {
+    code = transfer_data(e, q, n, r);
+  } else {
+    code = transfer_exit(e, n, r);
   }
-  r[0] = 0x77u;
-  return 1u;
+  if (code != 0u) {
+    rl = nrc(r, sid, code);
+  } else if (sid == 0x34u) {
+    rl = 4u;
+  } else if (sid == 0x36u) {
+    rl = 2u;
+  } else {
+    rl = 1u;
+  }
+  return rl;
 }
 
 /* ---------- dispatcher ---------- */
 uint16_t vecu_uds_handle(vecu_t *e, const uint8_t *req, uint16_t len, int functional, uint32_t now, uint8_t *resp)
 {
   uint16_t rl;
-  int suppress = 0;
+  bool suppress = false;
   const uint8_t sid = req[0];
   e->uds.last_req_ms = now;
   switch (sid) {
@@ -428,7 +516,7 @@ uint16_t vecu_uds_handle(vecu_t *e, const uint8_t *req, uint16_t len, int functi
                               (resp[2] == 0x7Eu) || (resp[2] == NRC_SNSIAS))) {
       rl = 0u;
     }
-  } else if (suppress != 0) {
+  } else if (suppress) {
     rl = 0u;
   } else {
     /* positive response */

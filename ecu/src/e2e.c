@@ -1,16 +1,17 @@
 #include "vecu/e2e.h"
 
-uint8_t vecu_crc8_j1850(const uint8_t *data, size_t len, uint8_t crc)
+uint8_t vecu_crc8_j1850(const uint8_t *data, size_t len, uint8_t init)
 {
+  uint8_t crc = init;
   size_t i;
-  int b;
+  uint8_t b;
   for (i = 0u; i < len; ++i) {
     crc = (uint8_t)(crc ^ data[i]);
-    for (b = 0; b < 8; ++b) {
+    for (b = 0u; b < 8u; ++b) {
       if ((crc & 0x80u) != 0u) {
-        crc = (uint8_t)(((unsigned)crc << 1) ^ 0x1Du);
+        crc = (uint8_t)(((uint32_t)crc << 1) ^ 0x1Du);
       } else {
-        crc = (uint8_t)((unsigned)crc << 1);
+        crc = (uint8_t)((uint32_t)crc << 1);
       }
     }
   }
