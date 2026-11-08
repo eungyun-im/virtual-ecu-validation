@@ -9,13 +9,13 @@ This is the software-in-the-loop half of my verification work. The hardware-in-t
 | Area | Result |
 |---|---|
 | Requirements | 20 in EARS form, **20/20 verified**, every one linked to tests in the [RTM](docs/rtm.md) |
-| Tests | 49 unit tests on a simulated clock, 59 system tests on a CAN bus, 1 fuzz run, all under ASan and UBSan |
+| Tests | 49 unit tests on a simulated clock, 59 system tests on SocketCAN `vcan0` in CI, libFuzzer 120 s (229k runs), all under ASan and UBSan |
 | Coverage | lines 92.7 %, **branches 83.4 %** (gate 80 %) |
-| Static analysis | cppcheck 0 warnings, Clang analyzer 0, gcc `-fanalyzer` 0 (CI); MISRA C:2012 findings reported by rule |
+| Static analysis | cppcheck 2.13: 0 warnings · gcc 13.3 `-fanalyzer`: 0 · Clang 18 analyzer: 0 · MISRA C:2012 addon: 186 findings reported by rule (15.5 single exit 60, 17.7 unused return value 43), not resolved |
 | Fault detection | steering timeout to SAFE_STOP **30 ms** after the last frame (limit 80 ms); P2 max **under 1 ms** (limit 50 ms) |
 | Defects | **DEF-001** found by fault injection: one corrupted frame drove the ECU to SAFE_STOP. Fixed, regression tests fail on the old code |
 
-Numbers are from the local run on 2026-11-08; CI writes the same report for every commit.
+Numbers are from the CI run on 2026-11-08; CI writes the same Test Report (verdict on its first line) for every commit.
 
 ## What the ECU does
 
@@ -67,7 +67,7 @@ coverage gate ───────────┤
 fuzzing 120 s ───────────┘
 ```
 
-A failing gate fails the run. The system job loads `vcan` when the runner allows it and otherwise uses the UDP virtual bus; the report says which. Tags `v*` mark baselines.
+A failing gate fails the run; [`tools/protect_main.sh`](tools/protect_main.sh) makes all six checks required for merging into `main` (GitHub allows that on a private repository only with a paid plan, so it is applied when the repository is public). The system job loads `vcan` when the runner allows it (it does on GitHub's Ubuntu 24.04 runners) and otherwise uses the UDP virtual bus; the report says which. Tags `v*` mark baselines.
 
 ## Defects
 
