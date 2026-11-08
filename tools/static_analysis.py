@@ -95,6 +95,8 @@ def main():
         result["tools"]["misra"] = {"version": ver, "total": sum(misra_rules.values()), "by_rule": dict(misra_rules.most_common()),
                                     "available": misra is not None}
         result["gate"]["cppcheck"] = len(gating) == 0
+        (OUT / "static_misra.txt").write_text("".join(
+            f"{f['file']}:{f['line']}: {f['id']} {f['msg']}\n" for f in (misra or []) if f["id"].startswith("misra")))
     else:
         result["tools"]["cppcheck"] = {"skipped": "cppcheck not installed"}
     w, info = gcc_analyzer()
