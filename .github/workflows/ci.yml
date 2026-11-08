@@ -1,0 +1,160 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONNOUSERSITE: "1"
+
+jobs:
+  build-static:
+    name: build + static analysis
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install analyzers
+        run: sudo apt-get update -q && sudo apt-get install -y -q cppcheck clang
+      - name: Build release and ASan (-Wall -Wextra -Wconversion -Werror)
+        run: make release asan
+      - name: Static analysis gate (cppcheck, gcc -fanalyzer, clang analyzer; MISRA reported)
+        run: python3 tools/static_analysis.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: static
+          path: reports/out/static*
+
+  unit:
+    name: unit tests (ASan + UBSan)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: make unit
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit
+          path: build/unit/*.xml
+
+  system:
+    name: system tests on CAN (ASan build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python tools
+        run: python -m venv .venv && .venv/bin/pip install -q -r requirements-dev.txt
+      - name: Bring up vcan0 (fall back to the UDP virtual bus)
+        run: |
+          if sudo modprobe vcan 2>/dev/null || { sudo apt-get install -y -q "linux-modules-extra-$(uname -r)" >/dev/null 2>&1 && sudo modprobe vcan; }; then
+            sudo ip link add dev vcan0 type vcan && sudo ip link set up vcan0 && echo "BUS=socketcan:vcan0" >> "$GITHUB_ENV"
+          else
+            echo "vcan not available on this runner, using the UDP virtual bus"; echo "BUS=vbus" >> "$GITHUB_ENV"
+          fi
+      - run: make asan
+      - name: System tests (smoke, regression, slow)
+        run: .venv/bin/python -m pytest tests --vecu build/asan/vecu --bus "$BUS" --junitxml=reports/out/systest.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: system
+          path: |
+            reports/out/systest.json
+            reports/out/systest.xml
+            build/ecu-logs/
+
+  coverage:
+    name: coverage gate (branch >= 80 %)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update -q && sudo apt-get install -y -q lcov
+      - run: python -m venv .venv && .venv/bin/pip install -q -r requirements-dev.txt
+      - name: Unit and system tests on the coverage build
+        run: make coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: |
+            reports/out/coverage.json
+            reports/out/coverage.txt
+            reports/out/coverage/
+            reports/out/lcov-html/
+
+  fuzz:
+    name: fuzzing (libFuzzer, 120 s)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: FUZZ_SECONDS=120 tools/fuzz.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fuzz
+          path: |
+            reports/out/fuzz.json
+            build/fuzz/artifacts/
+
+  report:
+    name: RTM + Test Report
+    needs: [build-static, unit, system, coverage, fuzz]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m venv .venv && .venv/bin/pip install -q -r requirements-dev.txt
+      - uses: actions/download-artifact@v4
+        with: {name: unit, path: build/unit}
+        continue-on-error: true
+      - uses: actions/download-artifact@v4
+        with: {name: static, path: reports/out}
+        continue-on-error: true
+      - uses: actions/download-artifact@v4
+        with: {name: system, path: dl/system}
+        continue-on-error: true
+      - uses: actions/download-artifact@v4
+        with: {name: coverage, path: dl/coverage}
+        continue-on-error: true
+      - uses: actions/download-artifact@v4
+        with: {name: fuzz, path: dl/fuzz}
+        continue-on-error: true
+      - name: Collect inputs
+        run: |
+          mkdir -p reports/out
+          find dl -name 'systest.json' -exec cp {} reports/out/ \; || true
+          find dl -name 'coverage.json' -exec cp {} reports/out/ \; || true
+          find dl -name 'fuzz.json' -exec cp {} reports/out/ \; || true
+          ls reports/out build/unit || true
+      - name: Test Report (first line = verdict)
+        run: |
+          .venv/bin/python tools/test_report.py | tee verdict.txt
+          cat verdict.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-report-${{ github.sha }}
+          path: |
+            reports/out/test_report.md
+            reports/out/rtm.json
+            docs/rtm.md
