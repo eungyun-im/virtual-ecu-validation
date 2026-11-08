@@ -92,13 +92,14 @@ PYTHONPATH=tools .venv/bin/python -m vecu.log_analyzer logs/demo.log      # log 
 
 ## Process
 
-[ASPICE mapping](docs/aspice_mapping.md) (SWE.1–SWE.6, SUP.8, SUP.9) · [RTM](docs/rtm.md) · [requirement change log](requirements/CHANGELOG.md)
+[ASPICE mapping](docs/aspice_mapping.md) (SWE.1–SWE.6, SUP.8, SUP.9) · [RTM](docs/rtm.md) · [requirement change log](requirements/CHANGELOG.md) · [scope checklist with deviations](docs/scope_checklist.md)
 
 ## Scope and limits
 
 - **SIL, not HIL.** Timing is measured on a Linux host; real-time behaviour on a target and electrical faults are out of scope (covered by the HILS project).
 - **E2E is a safety mechanism, not security.** A 4-bit counter and CRC8 stop faults, not a determined attacker; that needs SecOC.
 - **SecurityAccess uses a demonstration key algorithm.**
+- **ISO-TP in user space.** The UDS server uses its own ISO-TP layer instead of the Linux kernel ISO-TP socket, so it runs unchanged on the virtual bus.
 - **No CANoe/CAPL** (license). The same tests are written with python-can; logs export to formats CANoe reads.
 - **No Automotive Ethernet / SOME/IP.** CAN only.
 
