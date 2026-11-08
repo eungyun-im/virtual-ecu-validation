@@ -104,22 +104,25 @@ static int open_vbus(vecu_bus_t *b, const char *hostport)
   (void)memset(&b->peer, 0, sizeof b->peer);
   if (parse_hostport(hostport, host, sizeof host, &port) != 0) {
     (void)fprintf(stderr, "vbus spec must be vbus:<host>:<port>\n");
-  } else if (inet_pton(AF_INET, host, &b->peer.sin_addr) != 1) {
-    (void)fprintf(stderr, "bad vbus host %s\n", host);
   } else {
     /* cppcheck-suppress misra-c2012-17.3 ; FP-01 */
     /* cppcheck-suppress misra-config ; FP-01 */
-    const int fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (fd < 0) {
-      perror("socket(udp)");
+    const int parsed = inet_pton(AF_INET, host, &b->peer.sin_addr);
+    if (parsed != 1) {
+      (void)fprintf(stderr, "bad vbus host %s\n", host);
     } else {
-      (void)fcntl(fd, F_SETFL, O_NONBLOCK);
-      b->peer.sin_family = AF_INET;
-      b->peer.sin_port = htons(port);
-      b->fd = fd;
-      b->kind = BUS_VBUS;
-      vbus_ctl(b, 1u);
-      rc = 0;
+      const int fd = socket(AF_INET, SOCK_DGRAM, 0);
+      if (fd < 0) {
+        perror("socket(udp)");
+      } else {
+        (void)fcntl(fd, F_SETFL, O_NONBLOCK);
+        b->peer.sin_family = AF_INET;
+        b->peer.sin_port = htons(port);
+        b->fd = fd;
+        b->kind = BUS_VBUS;
+        vbus_ctl(b, 1u);
+        rc = 0;
+      }
     }
   }
   return rc;
@@ -179,13 +182,14 @@ int vecu_bus_recv(const vecu_bus_t *b, vecu_frame_t *f)
   if (b->kind == BUS_SOCKETCAN) {
     struct can_frame cf;
     ssize_t n;
+    int err;
     bool data_frame;
     (void)memset(&cf, 0, sizeof cf);
     n = read(b->fd, &cf, sizeof cf);
-    /* cppcheck-suppress misra-config ; FP-01 */
+    err = errno; /* read before any other call (rule 22.10) */
     data_frame = (cf.can_id & (CAN_ERR_FLAG | CAN_RTR_FLAG)) == 0u;
     if (n < 0) {
-      if (!would_block(errno)) {
+      if (!would_block(err)) {
         rc = -1;
       }
     } else if ((n == (ssize_t)sizeof cf) && data_frame) {
@@ -200,8 +204,11 @@ int vecu_bus_recv(const vecu_bus_t *b, vecu_frame_t *f)
   } else {
     uint8_t d[VBUS_LEN];
     const ssize_t n = recv(b->fd, d, sizeof d, 0);
+    const int err = errno; /* read before any other call (rule 22.10) */
+    /* cppcheck-suppress misra-config ; FP-01 */
+    const bool refused = err == ECONNREFUSED; /* broker not up yet: not an error */
     if (n < 0) {
-      if (!would_block(errno) && (errno != ECONNREFUSED)) {
+      if (!would_block(err) && !refused) {
         rc = -1;
       }
     } else if ((n == (ssize_t)VBUS_LEN) && (d[5] == 0u)) {

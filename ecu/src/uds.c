@@ -39,6 +39,7 @@ static uint16_t nrc(uint8_t *resp, uint8_t sid, uint8_t code)
 }
 
 /* Exported for the unit tests and the tester tool, which compute the expected key. */
+/* cppcheck-suppress misra-c2012-8.7 ; DEV-03 */
 uint32_t vecu_uds_key(uint32_t seed)
 {
   const uint32_t x = seed ^ 0x5A3C96E1u;

@@ -59,8 +59,8 @@ def cppcheck(exe, misra):
         if e.get("id") in ("missingInclude", "missingIncludeSystem", "checkersReport", "normalCheckLevelMaxBranches",
                            "toomanyconfigs"):
             continue
-        if e.get("id") == "unmatchedSuppression" and "misra" not in (e.get("msg") or ""):
-            continue
+        if e.get("id") == "unmatchedSuppression" and (not misra or "misra" not in (e.get("msg") or "")):
+            continue  # the plain run does not load the addon, so MISRA suppressions are unmatched there
         findings.append({"id": e.get("id"), "severity": e.get("severity"), "msg": e.get("msg"),
                          "file": loc.get("file") if loc is not None else "", "line": int(loc.get("line")) if loc is not None else 0})
     return findings
