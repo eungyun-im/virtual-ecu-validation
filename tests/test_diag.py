@@ -76,9 +76,17 @@ def test_req13_dtc_status_byte_lifecycle(env):
         assert c.clear_dtc(0xFFFFFF).positive
         r = c.get_number_of_dtc_by_status_mask(0x08)
         assert r.service_data.dtc_count == 0
-        supported = c.get_supported_dtc().service_data.dtcs
+        supported = {d.id: d.status.get_byte_as_int() for d in c.get_supported_dtc().service_data.dtcs}
         assert len(supported) == 6
-        assert all(d.status.get_byte_as_int() == 0x50 for d in supported)
+        # After the clear: testNotCompletedSinceLastClear | testNotCompletedThisOperationCycle (0x50).
+        # The range monitors run on every valid command frame (10 ms), so a range DTC may already
+        # show "tested, passed" (0x00) by the time the response is read; the timeout and E2E
+        # monitors have not run since the clear and must still read 0x50.
+        for code, status in supported.items():
+            if code in (0x4A0011, 0x4A0111):
+                assert status in (0x50, 0x00), hex(status)
+            else:
+                assert status == 0x50, hex(status)
 
 
 @pytest.mark.smoke
