@@ -1,0 +1,5 @@
+[vecu] running on vbus:127.0.0.1:39605
+[vecu] 150 ms INIT -> NORMAL
+[vecu] 380 ms NORMAL -> DEGRADED
+[vecu] 450 ms DEGRADED -> SAFE_STOP
+[vecu] stopped, 0 tx errors, 3 state changes

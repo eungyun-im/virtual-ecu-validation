@@ -1,0 +1,8 @@
+>       assert all(s.state == "NORMAL" for s in env.monitor.history[-15:])
+E       assert False
+E        +  where False = all(<generator object test_req08_two_invalid_no_change.<locals>.<genexpr> at 0x7ff6fdc6a270>)
+
+tests/test_faults.py:109: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_faults.py::test_req08_two_invalid_no_change - assert False
+1 failed in 1.01s

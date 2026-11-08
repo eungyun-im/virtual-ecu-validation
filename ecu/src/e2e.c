@@ -45,11 +45,19 @@ vecu_e2e_result_t vecu_e2e_check(vecu_e2e_rx_t *s, uint16_t data_id, const vecu_
     r = VECU_E2E_BAD_DLC;
   } else if (vecu_e2e_crc(data_id, f->data) != f->data[0]) {
     r = VECU_E2E_BAD_CRC;
-  } else if ((s->synced != 0u) && (counter != (uint8_t)((s->last_counter + 1u) & 0x0Fu))) {
-    r = VECU_E2E_BAD_COUNTER;
-  } else {
-    s->last_counter = counter;
+  } else if (s->synced == 0u) {
+    s->last_counter = counter; /* first frame after start-up or a timeout */
     s->synced = 1u;
+  } else {
+    const uint8_t delta = (uint8_t)((uint8_t)(counter - s->last_counter) & 0x0Fu);
+    if (delta == 0u) {
+      r = VECU_E2E_BAD_COUNTER; /* repeated: never accepted, no resync */
+    } else if (delta > VECU_E2E_MAX_DELTA) {
+      r = VECU_E2E_BAD_COUNTER; /* wrong sequence: discard, then follow the sender (DEF-001) */
+      s->last_counter = counter;
+    } else {
+      s->last_counter = counter; /* 1..MAX_DELTA: up to MAX_DELTA - 1 frames were lost */
+    }
   }
   return r;
 }

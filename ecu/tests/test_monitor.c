@@ -139,16 +139,18 @@ static void test_REQ_06_counter_skip_repeat_replay(void)
   vecu_frame_t f;
   sim_init(&S);
   sim_start(&S, 100, 0);
-  /* skip one counter value */
-  f = sim_cmd(VECU_ID_STEER_CMD, VECU_DATAID_STEER, 900, (uint8_t)((S.sc + 1u) & 0x0Fu));
-  vecu_rx(&S.e, &f, S.now);
-  CHECK_EQ(S.e.steer.cmd_raw, 100);
-  /* replay of the last accepted frame (same counter) */
+  /* replay of the last accepted frame (same counter): discarded */
   f = sim_cmd(VECU_ID_STEER_CMD, VECU_DATAID_STEER, 900, (uint8_t)((S.sc + 15u) & 0x0Fu));
   vecu_rx(&S.e, &f, S.now);
   CHECK_EQ(S.e.steer.cmd_raw, 100);
+  CHECK_EQ(S.e.steer.invalid_run, 1);
+  /* jump of 5: discarded */
+  f = sim_cmd(VECU_ID_STEER_CMD, VECU_DATAID_STEER, 900, (uint8_t)((S.sc + 4u) & 0x0Fu));
+  vecu_rx(&S.e, &f, S.now);
+  CHECK_EQ(S.e.steer.cmd_raw, 100);
   CHECK_EQ(S.e.steer.invalid_run, 2);
-  /* the expected counter is still accepted */
+  /* after the resync, a skip of one counter value (one lost frame) is accepted */
+  S.sc = (uint8_t)((S.sc + 6u) & 0x0Fu);
   sim_send_steer(&S, 900);
   CHECK_EQ(S.e.steer.cmd_raw, 900);
   CHECK_EQ(S.e.steer.invalid_run, 0);
@@ -165,6 +167,45 @@ static void test_REQ_06_resync_after_timeout(void)
   vecu_rx(&S.e, &f, S.now);
   CHECK_EQ(S.e.steer.cmd_raw, 77);
   CHECK(!S.e.steer.timed_out);
+}
+
+/* DEF-001: the sender's counter advances even when a frame is corrupted on the bus */
+static void corrupt_steer_advancing(sim_t *s)
+{
+  vecu_frame_t f = sim_cmd(VECU_ID_STEER_CMD, VECU_DATAID_STEER, 0, s->sc);
+  s->sc = (uint8_t)((s->sc + 1u) & 0x0Fu);
+  f.data[0] ^= 0xFFu;
+  vecu_rx(&s->e, &f, s->now);
+}
+
+static void test_REQ_06_lost_frames_tolerated_DEF_001(void)
+{
+  int i;
+  sim_init(&S);
+  sim_start(&S, 0, 0);
+  for (i = 0; i < 2; ++i) {
+    sim_drive(&S, 10u, 0, 0, SIM_SPEED);
+    corrupt_steer_advancing(&S);
+  }
+  sim_drive(&S, 300u, 0, 0, SIM_BOTH);
+  CHECK_EQ(S.e.state, VECU_NORMAL);
+  CHECK_EQ(S.e.steer.invalid_run, 0);
+}
+
+static void test_REQ_06_resync_after_large_jump_DEF_001(void)
+{
+  vecu_frame_t f;
+  sim_init(&S);
+  sim_start(&S, 0, 0);
+  S.sc = (uint8_t)((S.sc + 7u) & 0x0Fu); /* counter jumps by 8: discarded, then resynchronised */
+  sim_send_steer(&S, 300);
+  CHECK_EQ(S.e.steer.cmd_raw, 0);
+  sim_send_steer(&S, 300);
+  CHECK_EQ(S.e.steer.cmd_raw, 300);
+  /* a repeated counter is never accepted, even after a resync */
+  f = sim_cmd(VECU_ID_STEER_CMD, VECU_DATAID_STEER, 999, (uint8_t)((S.sc + 15u) & 0x0Fu));
+  vecu_rx(&S.e, &f, S.now);
+  CHECK_EQ(S.e.steer.cmd_raw, 300);
 }
 
 static void test_REQ_07_crc_bit_flips_and_data_id(void)
@@ -421,6 +462,8 @@ int main(int argc, char **argv)
       {"test_REQ_05_speed_timeout_degraded_and_ramp", test_REQ_05_speed_timeout_degraded_and_ramp},
       {"test_REQ_06_counter_skip_repeat_replay", test_REQ_06_counter_skip_repeat_replay},
       {"test_REQ_06_resync_after_timeout", test_REQ_06_resync_after_timeout},
+      {"test_REQ_06_lost_frames_tolerated_DEF_001", test_REQ_06_lost_frames_tolerated_DEF_001},
+      {"test_REQ_06_resync_after_large_jump_DEF_001", test_REQ_06_resync_after_large_jump_DEF_001},
       {"test_REQ_07_crc_bit_flips_and_data_id", test_REQ_07_crc_bit_flips_and_data_id},
       {"test_REQ_08_three_invalid_degraded_ten_safe", test_REQ_08_three_invalid_degraded_ten_safe},
       {"test_REQ_08_speed_invalid_degraded_only", test_REQ_08_speed_invalid_degraded_only},
