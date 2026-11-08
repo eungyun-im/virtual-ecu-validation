@@ -1,6 +1,10 @@
 # MISRA C:2012 compliance
 
-**Result: 0 open findings.** The cppcheck MISRA addon reported 186 findings on v1.0.0. All of them were fixed in the code except for two records: one deviation the tool reports, DEV-01 (4 sites), and one class of confirmed tool false positives, FP-01 (5 sites). A second deviation, DEV-02 (2 sites), was found by review because the tool does not report it. CI fails the build on any new finding, on a suppression that names no record here, and on a suppression that no longer matches a finding (`tools/static_analysis.py`, gate `misra`).
+**Result: 0 open findings.** The cppcheck MISRA addon reported 186 findings on v1.0.0. 179 were fixed in the code. The remaining 7 sites are covered by three records:
+- two deviations: DEV-01 (4 sites, host adapter only) and DEV-03 (1 site);
+- one confirmed tool false positive: FP-01 (2 suppressions on one line).
+
+A third deviation, DEV-02 (2 sites), was found by review because the tool does not report it. None of these records apply to the ECU core except DEV-03. CI fails the build on any new finding, on a suppression that names no record here, and on a suppression that no longer matches a finding (`tools/static_analysis.py`, gate `misra`).
 
 ## Scope and tool
 
@@ -31,8 +35,8 @@ Limits of the evidence:
 | 2.5 unused macro | Advisory | 4 | Removed. The documentation they carried (signal scaling, bit 7 of the DTC status) is kept as comments. |
 | 17.8 parameter modified | Advisory | 3 | The CRC routine works on a local copy of its `init` parameter. |
 | 10.4 operands of different essential type | Required | 3 | Session subfunction compared against `(uint8_t)UDS_SESSION_*`. |
-| 17.3 implicit function declaration | Mandatory | 3 | Tool false positives: the calls use macros from system headers that cppcheck does not read. After the socket code was restructured, 2 sites remain (FP-01). (`atoi` was also replaced by a checked `strtoul`.) |
-| 8.7 external linkage used in one unit | Advisory | 3 | The incremental SHA-256 functions are now `static`. Only the one-shot `vecu_sha256()` is exported. |
+| 17.3 implicit function declaration | Mandatory | 3 | Tool false positives: the calls use macros from system headers that cppcheck does not read. After the socket code was restructured, one remains, the `ioctl` call (FP-01). `atoi` was also replaced by a checked `strtoul`. |
+| 8.7 external linkage used in one unit | Advisory | 3 | The incremental SHA-256 functions are now `static`. Only the one-shot `vecu_sha256()` is exported. `vecu_uds_key()` stays exported for the tests (DEV-03). |
 | 11.3 cast between object pointer types | Required | 2 | The vbus peer address is stored as `struct sockaddr_in`, not as a byte array cast to `struct sockaddr *`. The remaining casts the socket API needs are DEV-02. |
 | 18.4 pointer arithmetic | Advisory | 2 | `host:port` parsing uses array indices. |
 | 21.6 / 21.5 / 21.10 standard I/O, signals, time | Required | 4 | DEV-01: host adapter only. |
@@ -40,9 +44,10 @@ Limits of the evidence:
 | 10.7, 10.6 composite operands | Required | 2 | Shift count computed into a local, and the `?:` operands carry the target type. Five more 10.6 sites surfaced after the first refactoring and were fixed by using `bool` and `if`/`else`. |
 | 13.3 increment with other side effects | Advisory | 1 | `argv[++i]` replaced by explicit indexing in `parse_args()`. |
 | 21.14 `memcmp` on strings | Required | 1 | The image magic is a `uint8_t` array, not a string literal. |
-| misra-config | (tool) | 4 | FP-01. |
+| misra-config | (tool) | 4 | 3 disappeared after the socket code was restructured; 1 remains, `SIOCGIFINDEX` (FP-01). |
+| 22.10 `errno` tested after a non-errno call | Required | (new) | Reported once the refactoring put a helper call between `recv` and the `errno` test. `errno` is now copied right after `read`/`recv`. |
 
-Behaviour is unchanged. The 49 unit tests, 59 system tests and the fuzzer pass on the refactored code, and branch coverage stays above the 80 % gate.
+Behaviour is unchanged. Two small changes are intentional: the vbus port is parsed strictly (1..65535), and a CAN frame buffer is zeroed before `read`. The 49 unit tests, 59 system tests and the fuzzer pass on the refactored code, and branch coverage stays above the 80 % gate.
 
 ## Records
 
@@ -53,7 +58,7 @@ Each suppression in the code names one of these IDs (`/* cppcheck-suppress misra
 | DEV-01 | 21.5, 21.6, 21.10 | `ecu/app/main.c`, `ecu/app/bus.c` (`<signal.h>`, `<stdio.h>`, `<time.h>`) | The host adapter runs the core as a Linux process. It needs SIGINT/SIGTERM for a clean stop (so coverage data is written), `clock_gettime` for the 1 ms tick, and stderr for diagnostics. On a target, the CAN driver and a timer interrupt replace this file. | None of these headers is included by `ecu/src/`; the build would show it. Signal handling is limited to setting a `volatile sig_atomic_t`. Output goes only to stderr and never affects control. |
 | DEV-02 | 11.3 | `ecu/app/bus.c`: `sa_of_can()`, `sa_of_in()` | The POSIX socket API (`bind`, `sendto`) takes `const struct sockaddr *`. Passing `struct sockaddr_can` or `struct sockaddr_in` needs this cast by design of the API. | Both casts are in two one-line functions, from a correctly typed and aligned object to the type the kernel expects. cppcheck 2.13 does not report them; the record comes from review and needs no suppression. |
 | DEV-03 | 8.7 | `ecu/src/uds.c`: `vecu_uds_key()` | The SecurityAccess key function is part of the ECU's interface to the test environment: the unit tests compute the expected key with it. cppcheck analyses only the ECU sources, so it sees a single caller. | The function is pure (no state, no side effects). A production ECU would not expose its key algorithm; the README states that the algorithm is a demonstration. |
-| FP-01 | 17.3, config | `ecu/app/bus.c`: `ioctl(…, SIOCGIFINDEX, …)`, `socket(AF_INET, …)`, `CAN_ERR_FLAG \| CAN_RTR_FLAG` | Tool false positive. cppcheck does not parse system headers, so the macros from `<sys/ioctl.h>`, `<sys/socket.h>` and `<linux/can.h>` are unknown to it ("misra-config"), and the calls that use them look undeclared (17.3). | Every function is declared by its system header. The build runs with `-std=c99 -Wall -Werror`, so an implicit declaration would fail compilation. |
+| FP-01 | 17.3, config | `ecu/app/bus.c`: `ioctl(fd, SIOCGIFINDEX, &ifr)` | Tool false positive. cppcheck does not parse system headers, so `SIOCGIFINDEX` from `<sys/ioctl.h>` is unknown to it ("misra-config"), and the `ioctl` call that uses it looks undeclared (17.3). | `ioctl` is declared by `<sys/ioctl.h>`. The build runs with `-std=c99 -Wall -Werror`, so an implicit declaration would fail compilation. |
 
 ## How to check
 

@@ -57,7 +57,7 @@ def main():
     basis = (f"{n_pass}/{n_req} requirements verified; {len(failed)} failed of {len(m['tests'])} tests "
              f"({len(unit)} unit, {len(system)} system, {1 if fuzz else 0} fuzz); "
              + (f"branch coverage {cov['branch_percent']}% (gate {COV_GATE:.0f}%); " if cov else "coverage not run; ")
-             + ("static analysis gate passed; " if static and static["passed"] else ("static analysis FAILED; " if static else "static analysis not run; "))
+             + (f"static analysis gate passed (MISRA {static['tools'].get('misra', {}).get('total', '?')} open); " if static and static["passed"] else ("static analysis FAILED; " if static else "static analysis not run; "))
              + f"{len(m['defects'])} defects, {len(open_major)} open Critical/Major"
              + (f"; missing: {', '.join(missing)}" if missing else ""))
     try:
@@ -74,7 +74,8 @@ def main():
          f"| Branch coverage >= {COV_GATE:.0f}% | {'PASS' if checks['coverage'] else ('not run' if not cov else 'FAIL')} | "
          + (f"lines {cov['line_percent']}%, branches {cov['branch_percent']}%, functions {cov['function_percent']}%" if cov else "-") + " |",
          f"| Static analysis | {'PASS' if checks['static'] else ('not run' if not static else 'FAIL')} | "
-         + (", ".join(f"{k}: {v.get('gating', v.get('warnings', v.get('skipped', '-')))}" for k, v in static["tools"].items() if k != "misra") if static else "-") + " |",
+         + (", ".join(f"{k}: {v.get('gating', v.get('warnings', v.get('skipped', '-')))}" for k, v in static["tools"].items() if k != "misra")
+            + (f", MISRA open: {static['tools']['misra'].get('total', '?')}" if "misra" in static["tools"] else "") if static else "-") + " |",
          f"| No open Critical/Major defect | {'PASS' if checks['defects'] else 'FAIL'} | {len(m['defects'])} recorded |", ""]
     L += ["## Requirements", "", "| ID | Requirement | Verdict | Unit | System | Defects |", "|---|---|---|---:|---:|---|"]
     for r in m["requirements"]:

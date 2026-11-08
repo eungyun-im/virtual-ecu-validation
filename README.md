@@ -11,9 +11,10 @@ This is the software-in-the-loop half of my verification work. The hardware-in-t
 | Area | Result |
 |---|---|
 | Requirements | 20 in EARS form, **20/20 verified**, every one linked to tests in the [RTM](docs/rtm.md) |
-| Tests | 49 unit tests on a simulated clock, 59 system tests on SocketCAN `vcan0` in CI, libFuzzer 120 s (229k runs), all under ASan and UBSan |
-| Coverage | lines 92.7 %, **branches 83.4 %** (gate 80 %) |
-| Static analysis | cppcheck 2.13: 0 warnings · gcc 13.3 `-fanalyzer`: 0 · Clang 18 analyzer: 0 · MISRA C:2012 addon: 186 findings reported by rule (15.5 single exit 60, 17.7 unused return value 43), not resolved |
+| Tests | 49 unit tests on a simulated clock, 59 system tests on SocketCAN `vcan0` in CI, libFuzzer 120 s (about 200k runs), all under ASan and UBSan |
+| Coverage | lines 93.5 %, **branches 83.0 %** (gate 80 %) |
+| Static analysis | cppcheck 2.13: 0 warnings · gcc 13.3 `-fanalyzer`: 0 · Clang 18 analyzer: 0 |
+| MISRA C:2012 | **0 open findings**, enforced as a CI gate. v1.0.0 had 186: 179 fixed in code (single exit, `bool` flags, no composite casts, …), 7 covered by deviations DEV-01 and DEV-03 and one confirmed tool false positive. A third deviation was found by review. Only DEV-03 touches the ECU core ([compliance record](docs/misra_deviations.md)) |
 | Fault detection | steering timeout to SAFE_STOP **30 ms** after the last frame (limit 80 ms); P2 max **under 1 ms** (limit 50 ms) |
 | Defects | **DEF-001** found by fault injection: one corrupted frame drove the ECU to SAFE_STOP. Fixed, regression tests fail on the old code |
 
@@ -50,7 +51,7 @@ All numbers come from [`requirements/requirements.yaml`](requirements/requiremen
 | Boundary | `pytest.mark.parametrize` tables on both sides of every limit | `tests/test_function.py` |
 | State transitions | every allowed transition; a fixture fails any test that produces a forbidden one | `tests/conftest.py` |
 | Security | SecurityAccess rules, replayed and forged CAN frames, UDS request fuzzing (up to 4095 bytes) | `tests/test_security.py`, `ecu/fuzz/` |
-| Static | cppcheck, MISRA addon, gcc `-fanalyzer`, Clang analyzer | `tools/static_analysis.py` |
+| Static | cppcheck, MISRA C:2012 addon (gate: no finding outside a recorded deviation), gcc `-fanalyzer`, Clang analyzer | `tools/static_analysis.py`, `docs/misra_deviations.md` |
 | Dynamic | ASan + UBSan on every unit and system test; libFuzzer on the whole frame input | `Makefile`, `tools/fuzz.sh` |
 | Coverage | gcov/gcovr (lcov HTML in CI), unit + system tests, branch gate 80 % | `tools/coverage.sh` |
 | Logs | Period statistics, gaps, range violations, E2E errors and state timeline from a CAN log | `tools/vecu/log_analyzer.py` |
@@ -92,11 +93,12 @@ PYTHONPATH=tools .venv/bin/python -m vecu.log_analyzer logs/demo.log      # log 
 
 ## Process
 
-[ASPICE mapping](docs/aspice_mapping.md) (SWE.1–SWE.6, SUP.8, SUP.9) · [RTM](docs/rtm.md) · [requirement change log](requirements/CHANGELOG.md) · [scope checklist with deviations](docs/scope_checklist.md)
+[ASPICE mapping](docs/aspice_mapping.md) (SWE.1–SWE.6, SUP.8, SUP.9) · [MISRA compliance record](docs/misra_deviations.md) · [RTM](docs/rtm.md) · [requirement change log](requirements/CHANGELOG.md) · [scope checklist with deviations](docs/scope_checklist.md)
 
 ## Scope and limits
 
 - **SIL, not HIL.** Timing is measured on a Linux host; real-time behaviour on a target and electrical faults are out of scope (covered by the HILS project).
+- **MISRA checked with cppcheck**, which is not a qualified checker and does not cover every rule; deviations are justified but not approved by a second person.
 - **E2E is a safety mechanism, not security.** A 4-bit counter and CRC8 stop faults, not a determined attacker; that needs SecOC.
 - **SecurityAccess uses a demonstration key algorithm.**
 - **ISO-TP in user space.** The UDS server uses its own ISO-TP layer instead of the Linux kernel ISO-TP socket, so it runs unchanged on the virtual bus.
