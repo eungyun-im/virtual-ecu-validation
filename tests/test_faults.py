@@ -146,7 +146,10 @@ def test_req10_recovery_after_one_second(env):
     env.restbus.clear()
     n = env.monitor.wait_state("NORMAL", 2.5)
     assert n is not None
-    assert 1.0 <= n.t - t_resume <= 1.0 + 0.08
+    # measured from the first steering frame sent after the fault; REQ-10 allows +-10 ms, plus one
+    # 20 ms status period and scheduling on the host for the upper bound
+    first = min(e[0] for e in env.restbus.log if e[1] == "steer" and e[3] is not None and e[0] >= t_resume)
+    assert 1.0 - 0.010 <= n.t - first <= 1.0 + 0.010 + 0.040, f"recovered after {n.t - first:.4f} s"
     with env.uds() as c:
         r = c.get_dtc_by_status_mask(0x08)
     assert any(d.id == 0xC10087 for d in r.service_data.dtcs), "DTC kept after recovery"

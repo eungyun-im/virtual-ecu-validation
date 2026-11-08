@@ -148,6 +148,7 @@ jobs:
           ls reports/out build/unit || true
       - name: Test Report (first line = verdict)
         run: |
+          set -o pipefail
           .venv/bin/python tools/test_report.py | tee verdict.txt
           cat verdict.txt >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4

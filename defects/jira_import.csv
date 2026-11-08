@@ -1,0 +1,27 @@
+Summary,Issue Type,Priority,Labels,Status,Component,Affects Version,Fix Version,Environment,Description
+[DEF-001] One corrupted command frame drives the ECU to SAFE_STOP (alive counter never resynchronises),Bug,High,severity-critical req-06 req-08 fault-injection-system-test,Verified,E2E,a9a69c0,8a008f5,"Virtual ECU `build/asan/vecu` at commit a9a69c0, UDP virtual bus, rest-bus `tools/vecu/restbus.py`, Ubuntu 20.04, GCC 9.4 with ASan and UBSan.","h3. Steps to reproduce
+1. Start the ECU and the rest-bus with valid STEER_CMD and SPEED_CMD every 10 ms; wait for NORMAL.
+2. Corrupt the CRC of 2 consecutive STEER_CMD frames (`rb.inject(""steer"", ""crc"", frames=2)`). The sender's alive counter keeps counting, as on a real bus.
+3. Keep sending valid frames.
+
+h3. Expected result
+REQ-08: fewer than 3 consecutive discarded frames do not change the state. The ECU stays in NORMAL.
+
+h3. Actual result
+NORMAL -> DEGRADED after 2 corrupted frames (+70 ms), DEGRADED -> SAFE_STOP 70 ms later. Every valid frame after the corrupted ones was discarded as a counter error.
+Log (`defects/evidence/DEF-001_ecu.log`):
+{noformat}
+[vecu] 150 ms INIT -> NORMAL
+[vecu] 380 ms NORMAL -> DEGRADED
+[vecu] 450 ms DEGRADED -> SAFE_STOP
+{noformat}
+
+h3. Root cause
+`vecu_e2e_check` accepted only counter == last accepted + 1 and updated the last counter only for accepted frames. After a corrupted frame the sender is one step ahead, so no later frame can ever match: the receiver never resynchronises, and 10 discarded frames trigger SAFE_STOP (REQ-08).
+The unit tests did not catch it because their helper sent corrupted frames without advancing the counter, which a real sender never does.
+
+h3. Fix
+Counter delta 1..3 is accepted (up to two lost frames); delta 0 (repeat or replay) is discarded; a larger jump is discarded and the receiver resynchronises to it. REQ-06 was updated to state this rule (change log in `requirements/CHANGELOG.md`).
+
+h3. Verification
+The two unit tests and the system test above fail on a9a69c0 and pass on 8a008f5. Full unit and system suites pass on the ASan build."
