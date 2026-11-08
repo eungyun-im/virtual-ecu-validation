@@ -105,8 +105,6 @@ static int open_vbus(vecu_bus_t *b, const char *hostport)
   if (parse_hostport(hostport, host, sizeof host, &port) != 0) {
     (void)fprintf(stderr, "vbus spec must be vbus:<host>:<port>\n");
   } else {
-    /* cppcheck-suppress misra-c2012-17.3 ; FP-01 */
-    /* cppcheck-suppress misra-config ; FP-01 */
     const int parsed = inet_pton(AF_INET, host, &b->peer.sin_addr);
     if (parsed != 1) {
       (void)fprintf(stderr, "bad vbus host %s\n", host);
@@ -205,7 +203,6 @@ int vecu_bus_recv(const vecu_bus_t *b, vecu_frame_t *f)
     uint8_t d[VBUS_LEN];
     const ssize_t n = recv(b->fd, d, sizeof d, 0);
     const int err = errno; /* read before any other call (rule 22.10) */
-    /* cppcheck-suppress misra-config ; FP-01 */
     const bool refused = err == ECONNREFUSED; /* broker not up yet: not an error */
     if (n < 0) {
       if (!would_block(err) && !refused) {
