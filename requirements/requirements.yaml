@@ -43,10 +43,11 @@ requirements:
     category: communication
     title: E2E alive counter
     text: >-
-      If a received command frame has an alive counter that is not the previous accepted counter
-      plus one (modulo 16), the ECU shall discard the frame. The first frame after start-up or after a
-      timeout is accepted to resynchronise.
-    pass: "Repeated, skipped and replayed counters are discarded; output unchanged."
+      When a received command frame has an alive counter equal to the previous accepted counter, the
+      ECU shall discard it (repeat or replay). When the counter advanced by more than 3 (modulo 16),
+      the ECU shall discard the frame and resynchronise to its counter. A counter advance of 1 to 3
+      shall be accepted (up to two lost frames). The first frame after start-up or a timeout is accepted.
+    pass: "Repeated and replayed counters and jumps of 4..15 are discarded; 2 corrupted frames do not change the state (DEF-001)."
   - id: REQ-07
     category: communication
     title: E2E CRC
@@ -105,7 +106,8 @@ requirements:
     text: >-
       The ECU shall answer DiagnosticSessionControl (0x10), ReadDataByIdentifier (0x22),
       ReadDTCInformation (0x19, sub-functions 0x01, 0x02, 0x0A), ClearDiagnosticInformation (0x14),
-      SecurityAccess (0x27) and TesterPresent (0x3E) on request ID 0x7E0 with response ID 0x7E8, and
+      SecurityAccess (0x27), TesterPresent (0x3E) and ECUReset (0x11) on request ID 0x7E0 with
+      response ID 0x7E8 (and on functional ID 0x7DF, without NRC 0x11, 0x12, 0x31, 0x7E, 0x7F), and
       answer any other service with NRC 0x11 and a wrong length with NRC 0x13.
     pass: "Positive response format per ISO 14229-1 for each service; NRC 0x11, 0x12, 0x13, 0x31 where specified."
   - id: REQ-15

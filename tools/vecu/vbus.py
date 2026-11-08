@@ -64,7 +64,7 @@ class VBus(can.BusABC):
                 continue
             dlc = min(dlc, 8)
             return can.Message(timestamp=time.time(), arbitration_id=fid, is_extended_id=False, dlc=dlc,
-                               data=data[:dlc], channel=self.channel_info), False
+                               data=data[:dlc], channel="vbus0"), False
 
     def shutdown(self):
         self._stop.set()

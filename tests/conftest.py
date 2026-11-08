@@ -34,6 +34,8 @@ def pytest_addoption(parser):
     parser.addoption("--vecu", default=str(ROOT / "build" / "release" / "vecu"), help="ECU binary")
     parser.addoption("--bus", default="auto", help="socketcan:vcan0, vbus, or auto (vcan0 if present)")
     parser.addoption("--ecu-logs", default=str(ROOT / "build" / "ecu-logs"), help="ECU stderr per test")
+    parser.addoption("--results-json", default=str(ROOT / "reports" / "out" / "systest.json"),
+                     help="per-test results with requirement IDs")
 
 
 def pytest_configure(config):
@@ -56,6 +58,7 @@ def bus_spec(request):
     spec = request.config.getoption("--bus")
     if spec == "auto":
         spec = "socketcan:vcan0" if Path("/sys/class/net/vcan0").exists() else "vbus"
+    request.config._vecu_bus_kind = spec.split(":")[0]
     if spec == "vbus":
         port = _free_port()
         broker = subprocess.Popen([sys.executable, "-m", "vecu.vbus", "--port", str(port)],
@@ -134,3 +137,34 @@ def env(request, bus_spec):
     assert rc == 0, f"ECU exit code {rc}, log {e.log_path}"
     forbidden = [t for t in e.monitor.transitions if (t[1], t[2]) not in ALLOWED]
     assert not forbidden, f"forbidden state transitions (REQ-11): {forbidden}"
+
+
+# ---------- results per requirement for tools/rtm.py and tools/test_report.py ----------
+_RESULTS = []
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    rep = outcome.get_result()
+    if rep.when == "call" or (rep.when == "setup" and rep.outcome != "passed") or (rep.when == "teardown" and rep.failed):
+        reqs = [m.args[0] for m in item.iter_markers("req")]
+        marks = sorted({m.name for m in item.iter_markers()} & {"smoke", "regression", "slow"})
+        status = "skipped" if rep.skipped else ("passed" if rep.passed else "failed")
+        prev = next((r for r in _RESULTS if r["nodeid"] == item.nodeid), None)
+        if prev is None:
+            _RESULTS.append({"nodeid": item.nodeid, "reqs": reqs, "markers": marks, "outcome": status,
+                             "duration_s": round(rep.duration, 3), "message": str(rep.longrepr)[-400:] if rep.failed else ""})
+        elif rep.failed:  # a teardown failure (sanitizer, forbidden transition) fails the test
+            prev.update(outcome="failed", message=str(rep.longrepr)[-400:])
+        p2 = getattr(item.funcargs.get("env"), "p2_ms", None) if hasattr(item, "funcargs") else None
+        if p2 and rep.when == "call":
+            _RESULTS[-1]["p2_ms"] = {"max": round(max(p2), 3), "mean": round(sum(p2) / len(p2), 3), "n": len(p2)}
+
+
+def pytest_sessionfinish(session, exitstatus):
+    out = Path(session.config.getoption("--results-json"))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    import json
+    out.write_text(json.dumps({"bus": getattr(session.config, "_vecu_bus_kind", session.config.getoption("--bus")), "vecu": session.config.getoption("--vecu"),
+                               "tests": _RESULTS}, indent=1))

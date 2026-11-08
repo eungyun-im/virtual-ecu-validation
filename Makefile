@@ -1,5 +1,7 @@
 # Build, test and analysis entry points. CI runs the same targets (.github/workflows/ci.yml).
 CC ?= gcc
+export PYTHONNOUSERSITE := 1
+export PYTHONPATH := tools
 CFLAGS_COMMON := -std=c99 -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Werror -Iecu/include
 CORE_SRC := ecu/src/e2e.c ecu/src/dtc.c ecu/src/sha256.c ecu/src/isotp.c ecu/src/swupdate.c ecu/src/uds.c ecu/src/ecu.c
 APP_SRC := ecu/app/main.c ecu/app/bus.c
@@ -52,7 +54,7 @@ coverage: unit-cov $(B)/cov/vecu
 	tools/coverage.sh
 
 analyze:
-	tools/static_analysis.sh
+	.venv/bin/python tools/static_analysis.py
 
 fuzz:
 	tools/fuzz.sh

@@ -1,0 +1,11 @@
+# Pinned tool versions for tests, analysis and reports (Python 3.8 to 3.12)
+python-can==4.5.0
+cantools==39.4.13
+can-isotp==2.0.4
+udsoncan==1.23.1
+pytest==7.4.4
+pytest-timeout==2.3.1
+gcovr==7.2
+PyYAML==6.0.2
+matplotlib==3.7.5; python_version < "3.9"
+matplotlib==3.9.2; python_version >= "3.9"
