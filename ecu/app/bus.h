@@ -6,21 +6,21 @@
 #ifndef VECU_BUS_H
 #define VECU_BUS_H
 
+#include <netinet/in.h>
+
 #include "vecu/vecu_types.h"
 
 typedef struct {
   int fd;
-  int kind; /* 1 socketcan, 2 vbus */
-  /* vbus */
-  unsigned char peer[32]; /* struct sockaddr_in */
-  unsigned peer_len;
+  int kind;                /* 1 socketcan, 2 vbus */
+  struct sockaddr_in peer; /* vbus broker */
 } vecu_bus_t;
 
 int vecu_bus_open(vecu_bus_t *b, const char *spec);
-int vecu_bus_send(vecu_bus_t *b, const vecu_frame_t *f);
+int vecu_bus_send(const vecu_bus_t *b, const vecu_frame_t *f);
 /* Non-blocking read: 1 = frame, 0 = none, -1 = error */
-int vecu_bus_recv(vecu_bus_t *b, vecu_frame_t *f);
-void vecu_bus_keepalive(vecu_bus_t *b);
+int vecu_bus_recv(const vecu_bus_t *b, vecu_frame_t *f);
+void vecu_bus_keepalive(const vecu_bus_t *b);
 void vecu_bus_close(vecu_bus_t *b);
 
 #endif

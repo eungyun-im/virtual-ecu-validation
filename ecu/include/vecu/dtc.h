@@ -17,7 +17,7 @@ extern "C" {
 #define DTC_TNCSLC 0x10u  /* testNotCompletedSinceLastClear */
 #define DTC_TFSLC 0x20u   /* testFailedSinceLastClear */
 #define DTC_TNCTOC 0x40u  /* testNotCompletedThisOperationCycle */
-#define DTC_WIR 0x80u     /* warningIndicatorRequested (not used) */
+/* bit 7 warningIndicatorRequested is not supported (always 0) */
 #define DTC_AVAILABILITY_MASK 0x7Fu
 
 typedef enum {
@@ -38,7 +38,7 @@ uint32_t vecu_dtc_code(vecu_dtc_idx_t i);
 void vecu_dtc_clear(vecu_dtc_mem_t *m);
 /* Start of an operation cycle (power-up or ECUReset): clears TFTOC, sets TNCTOC */
 void vecu_dtc_new_cycle(vecu_dtc_mem_t *m);
-void vecu_dtc_report(vecu_dtc_mem_t *m, vecu_dtc_idx_t i, int failed);
+void vecu_dtc_report(vecu_dtc_mem_t *m, vecu_dtc_idx_t i, bool failed);
 uint8_t vecu_dtc_confirmed_count(const vecu_dtc_mem_t *m);
 
 #ifdef __cplusplus

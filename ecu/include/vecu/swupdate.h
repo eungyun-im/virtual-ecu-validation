@@ -25,7 +25,9 @@ typedef struct {
   uint32_t staged_version; /* 0 = nothing staged; activated by ECUReset */
   /* download in progress */
   uint8_t active;
-  uint32_t announced_version, size, received;
+  uint32_t announced_version;
+  uint32_t size;
+  uint32_t received;
   uint8_t next_seq;
   uint8_t buf[VECU_IMG_MAX];
 } vecu_flash_t;
