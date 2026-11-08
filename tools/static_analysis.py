@@ -6,8 +6,9 @@
   gcc -fanalyzer (GCC >= 10)                            gate: 0 warnings
   clang --analyze (Clang static analyzer)               gate: 0 warnings
 MISRA deviations are inline suppressions of the form
-  /* cppcheck-suppress misra-c2012-<rule> ; DEV-nn */
-and each DEV-nn must be a row of docs/misra_deviations.md that lists that rule. A suppression without a
+  /* cppcheck-suppress misra-c2012-<rule> ; DEV-nn */     (deviation from a rule)
+  /* cppcheck-suppress misra-<id> ; FP-nn */             (confirmed tool false positive)
+and each DEV-nn / FP-nn must be a row of docs/misra_deviations.md that lists that rule. A suppression without a
 recorded deviation, or a deviation that no longer matches a finding, fails the gate.
 Results: reports/out/static.json and reports/out/static_*.txt. A tool that is not installed is
 reported as "skipped" and does not pass silently: the JSON says so and the Test Report shows it.
@@ -27,8 +28,8 @@ SRC = sorted(str(p.relative_to(ROOT)) for p in (ROOT / "ecu" / "src").glob("*.c"
       sorted(str(p.relative_to(ROOT)) for p in (ROOT / "ecu" / "app").glob("*.c"))
 INC = ["-Iecu/include"]
 DEV_DOC = ROOT / "docs" / "misra_deviations.md"
-SUPPRESS_RE = re.compile(r"cppcheck-suppress\s+misra-c2012-([0-9.]+)\s*(?:;\s*(DEV-\d+))?")
-DEV_ROW_RE = re.compile(r"^\|\s*(DEV-\d+)\s*\|\s*([^|]+)\|", re.M)
+SUPPRESS_RE = re.compile(r"cppcheck-suppress\s+misra-(?:c2012-)?([0-9.]+|config)\s*(?:;\s*((?:DEV|FP)-\d+))?")
+DEV_ROW_RE = re.compile(r"^\|\s*((?:DEV|FP)-\d+)\s*\|\s*([^|]+)\|", re.M)
 
 
 def run(cmd):
@@ -70,7 +71,7 @@ def misra_deviations():
     recorded = {}
     if DEV_DOC.exists():
         for dev, rules in DEV_ROW_RE.findall(DEV_DOC.read_text()):
-            recorded[dev] = set(re.findall(r"\d+\.\d+", rules))
+            recorded[dev] = set(re.findall(r"\d+\.\d+|config", rules))
     sites, problems = [], []
     files = SRC + sorted(str(p.relative_to(ROOT)) for p in (ROOT / "ecu").rglob("*.h"))
     for f in files:

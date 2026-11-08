@@ -88,8 +88,10 @@ def main():
         L.append(f"- Fuzzing (REQ-19): {fuzz['executions']} executions in {fuzz['seconds']} s, {fuzz['coverage_edges']} edges, exit code {fuzz['exit_code']}.")
     if static and "misra" in static["tools"]:
         mi = static["tools"]["misra"]
-        top = ", ".join(f"{k} ({v})" for k, v in list(mi.get("by_rule", {}).items())[:6])
-        L.append(f"- MISRA C:2012 (cppcheck addon, reported only): {mi.get('total', 0)} findings; most frequent rules {top}.")
+        devs = ", ".join(f"{k} ({v})" for k, v in mi.get("deviations_by_rule", {}).items()) or "none"
+        L.append(f"- MISRA C:2012 (cppcheck addon, gate): {mi.get('total', 0)} open findings; "
+                 f"{mi.get('deviation_sites', 0)} suppressed sites, each tied to a record in `docs/misra_deviations.md` "
+                 f"(by rule: {devs}); record problems: {len(mi.get('deviation_problems', []))}.")
     if cov:
         L += ["", "### Coverage by file", "", "| File | Lines | Branches |", "|---|---:|---:|"]
         for f in cov["files"]:

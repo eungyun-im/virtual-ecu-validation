@@ -203,19 +203,20 @@ static void control_cycle(vecu_t *e)
 static void on_diag(vecu_t *e, const vecu_frame_t *f, int functional, uint32_t now)
 {
   static uint8_t req[VECU_ISOTP_MAX];
-  static uint8_t resp[VECU_ISOTP_MAX];
   uint16_t n = 0u;
   if (functional != 0) {
     /* functional requests: single frames only, anything else is ignored */
     const uint8_t pci = f->data[0];
     if (((pci >> 4) == 0u) && ((pci & 0x0Fu) != 0u) && ((pci & 0x0Fu) <= 7u)) {
-      n = (uint16_t)(pci & 0x0Fu);
-      (void)memcpy(req, &f->data[1], n);
+      const uint8_t len = (uint8_t)(pci & 0x0Fu);
+      n = len;
+      (void)memcpy(req, &f->data[1], len);
     }
   } else {
     n = vecu_isotp_on_frame(&e->isotp, f, now, req);
   }
   if (n != 0u) {
+    static uint8_t resp[VECU_ISOTP_MAX];
     const uint16_t rl = vecu_uds_handle(e, req, n, functional, now, resp);
     if (rl != 0u) {
       (void)vecu_isotp_send(&e->isotp, resp, rl, now);

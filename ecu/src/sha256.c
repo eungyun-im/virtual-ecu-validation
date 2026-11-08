@@ -24,8 +24,6 @@ static void block(vecu_sha256_t *c, const uint8_t *p)
   uint32_t f;
   uint32_t g;
   uint32_t h;
-  uint32_t t1;
-  uint32_t t2;
   uint32_t i;
   for (i = 0u; i < 16u; ++i) {
     w[i] = ((uint32_t)p[4u * i] << 24) | ((uint32_t)p[(4u * i) + 1u] << 16) | ((uint32_t)p[(4u * i) + 2u] << 8) |
@@ -39,8 +37,8 @@ static void block(vecu_sha256_t *c, const uint8_t *p)
   a = c->h[0]; b = c->h[1]; cc = c->h[2]; d = c->h[3];
   e = c->h[4]; f = c->h[5]; g = c->h[6]; h = c->h[7];
   for (i = 0u; i < 64u; ++i) {
-    t1 = h + (rotr(e, 6u) ^ rotr(e, 11u) ^ rotr(e, 25u)) + ((e & f) ^ ((~e) & g)) + k_k[i] + w[i];
-    t2 = (rotr(a, 2u) ^ rotr(a, 13u) ^ rotr(a, 22u)) + ((a & b) ^ (a & cc) ^ (b & cc));
+    const uint32_t t1 = h + (rotr(e, 6u) ^ rotr(e, 11u) ^ rotr(e, 25u)) + ((e & f) ^ ((~e) & g)) + k_k[i] + w[i];
+    const uint32_t t2 = (rotr(a, 2u) ^ rotr(a, 13u) ^ rotr(a, 22u)) + ((a & b) ^ (a & cc) ^ (b & cc));
     h = g; g = f; f = e; e = d + t1; d = cc; cc = b; b = a; a = t1 + t2;
   }
   c->h[0] += a; c->h[1] += b; c->h[2] += cc; c->h[3] += d;

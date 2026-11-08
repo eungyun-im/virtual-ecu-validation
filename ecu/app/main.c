@@ -80,8 +80,11 @@ static void run(vecu_t *ecu)
   while (g_stop == 0) {
     struct pollfd p = {g_bus.fd, POLLIN, 0};
     uint64_t now_us = mono_us();
-    const int wait_ms = (now_us >= next_tick_us) ? 0 : 1; /* the next tick is at most 1 ms away */
+    int wait_ms = 1; /* the next tick is at most 1 ms away */
     vecu_frame_t f;
+    if (now_us >= next_tick_us) {
+      wait_ms = 0;
+    }
     (void)poll(&p, 1u, wait_ms);
     now_us = mono_us();
     while (now_us >= next_tick_us) { /* catch up if the process was delayed */

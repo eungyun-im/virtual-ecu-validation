@@ -39,7 +39,6 @@ static uint16_t nrc(uint8_t *resp, uint8_t sid, uint8_t code)
 }
 
 /* Exported for the unit tests and the tester tool, which compute the expected key. */
-/* cppcheck-suppress misra-c2012-8.7 ; DEV-03 */
 uint32_t vecu_uds_key(uint32_t seed)
 {
   const uint32_t x = seed ^ 0x5A3C96E1u;
@@ -74,7 +73,7 @@ static void to_default(vecu_t *e)
 }
 
 /* ---------- 0x10 DiagnosticSessionControl ---------- */
-static uint16_t svc_session(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r, int *suppress)
+static uint16_t svc_session(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r, bool *suppress)
 {
   uint8_t code = 0u;
   uint16_t rl = 0u;
@@ -83,7 +82,7 @@ static uint16_t svc_session(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r,
     code = NRC_IMLOIF;
   } else {
     sub = (uint8_t)(q[1] & 0x7Fu);
-    *suppress = ((q[1] & 0x80u) != 0u) ? 1 : 0;
+    *suppress = (q[1] & 0x80u) != 0u;
     if (sub == (uint8_t)UDS_SESSION_DEFAULT) {
       to_default(e);
     } else if (sub == (uint8_t)UDS_SESSION_EXTENDED) {
@@ -116,7 +115,7 @@ static uint16_t svc_session(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r,
 }
 
 /* ---------- 0x11 ECUReset ---------- */
-static uint16_t svc_reset(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r, int *suppress)
+static uint16_t svc_reset(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r, bool *suppress)
 {
   uint16_t rl;
   if (n != 2u) {
@@ -124,7 +123,7 @@ static uint16_t svc_reset(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r, i
   } else if ((q[1] & 0x7Fu) != 0x01u) {
     rl = nrc(r, 0x11u, NRC_SFNS);
   } else {
-    *suppress = ((q[1] & 0x80u) != 0u) ? 1 : 0;
+    *suppress = (q[1] & 0x80u) != 0u;
     e->uds.reset_pending = 1u; /* after the response has left */
     r[0] = 0x51u;
     r[1] = 0x01u;
@@ -227,17 +226,16 @@ static uint16_t put_dtc(const vecu_t *e, uint8_t *r, uint16_t at, uint8_t i)
   return (uint16_t)(at + 4u);
 }
 
-static uint16_t svc_rdtc(const vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r, int *suppress)
+static uint16_t svc_rdtc(const vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r, bool *suppress)
 {
   uint8_t code = 0u;
   uint16_t at = 0u;
-  uint8_t sub;
-  uint8_t i;
   if (n < 2u) {
     code = NRC_IMLOIF;
   } else {
-    sub = (uint8_t)(q[1] & 0x7Fu);
-    *suppress = ((q[1] & 0x80u) != 0u) ? 1 : 0;
+    const uint8_t sub = (uint8_t)(q[1] & 0x7Fu);
+    uint8_t i;
+    *suppress = (q[1] & 0x80u) != 0u;
     r[0] = 0x59u;
     r[1] = sub;
     r[2] = DTC_AVAILABILITY_MASK;
@@ -375,7 +373,7 @@ static uint16_t svc_security(vecu_t *e, const uint8_t *q, uint16_t n, uint8_t *r
 }
 
 /* ---------- 0x3E TesterPresent ---------- */
-static uint16_t svc_tester(const uint8_t *q, uint16_t n, uint8_t *r, int *suppress)
+static uint16_t svc_tester(const uint8_t *q, uint16_t n, uint8_t *r, bool *suppress)
 {
   uint16_t rl;
   if (n != 2u) {
@@ -383,7 +381,7 @@ static uint16_t svc_tester(const uint8_t *q, uint16_t n, uint8_t *r, int *suppre
   } else if ((q[1] & 0x7Fu) != 0u) {
     rl = nrc(r, 0x3Eu, NRC_SFNS);
   } else {
-    *suppress = ((q[1] & 0x80u) != 0u) ? 1 : 0;
+    *suppress = (q[1] & 0x80u) != 0u;
     r[0] = 0x7Eu;
     r[1] = 0x00u;
     rl = 2u;
@@ -495,7 +493,7 @@ static uint16_t svc_download(vecu_t *e, uint8_t sid, const uint8_t *q, uint16_t 
 uint16_t vecu_uds_handle(vecu_t *e, const uint8_t *req, uint16_t len, int functional, uint32_t now, uint8_t *resp)
 {
   uint16_t rl;
-  int suppress = 0;
+  bool suppress = false;
   const uint8_t sid = req[0];
   e->uds.last_req_ms = now;
   switch (sid) {
@@ -517,7 +515,7 @@ uint16_t vecu_uds_handle(vecu_t *e, const uint8_t *req, uint16_t len, int functi
                               (resp[2] == 0x7Eu) || (resp[2] == NRC_SNSIAS))) {
       rl = 0u;
     }
-  } else if (suppress != 0) {
+  } else if (suppress) {
     rl = 0u;
   } else {
     /* positive response */
